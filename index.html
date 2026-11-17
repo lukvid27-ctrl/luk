@@ -4,10 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>FC 8-bit Mobile</title>
-  <link href="https://googleapis.com" rel="stylesheet">
-  <script src="https://unpkg.com"></script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Press Start 2P', monospace; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Courier New', Courier, monospace; font-weight: bold; }
     body {
       background: repeating-linear-gradient(0deg, #0b1911 0px, #0b1911 16px, #0f2418 16px, #0f2418 32px);
       color: #ffffff;
@@ -20,7 +18,7 @@
     header {
       width: 100%;
       background: #141c2b;
-      padding: 16px 20px;
+      padding: 16px 24px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -29,13 +27,13 @@
       flex-wrap: wrap;
       gap: 10px;
     }
-    h1 { font-size: 1.1rem; color: #39ff14; text-shadow: 3px 3px 0px #000; }
+    h1 { font-size: 1.4rem; color: #39ff14; text-shadow: 2px 2px 0px #000; letter-spacing: 1px; }
     .coins {
       background: #2b2100;
-      padding: 10px 14px;
+      padding: 8px 14px;
       border: 3px solid #ffd700;
       color: #ffd700;
-      font-size: 0.75rem;
+      font-size: 0.95rem;
       box-shadow: 3px 3px 0 #000;
     }
     nav { display: flex; gap: 12px; margin: 20px 10px; flex-wrap: wrap; justify-content: center; }
@@ -43,8 +41,8 @@
       background: #39ff14;
       color: #000000;
       border: 3px solid #ffffff;
-      padding: 12px 16px;
-      font-size: 0.7rem;
+      padding: 12px 18px;
+      font-size: 0.9rem;
       cursor: pointer;
       box-shadow: 4px 4px 0px #000000;
     }
@@ -62,8 +60,8 @@
       text-align: center;
     }
     .panel.active { display: block; }
-    h2 { font-size: 1rem; color: #ffd700; margin-bottom: 14px; text-shadow: 2px 2px 0 #000; }
-    p { font-size: 0.65rem; line-height: 1.6; color: #cbd5e1; }
+    h2 { font-size: 1.2rem; color: #ffd700; margin-bottom: 12px; text-shadow: 2px 2px 0 #000; }
+    p { font-size: 0.85rem; line-height: 1.5; color: #cbd5e1; }
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 14px; margin-top: 18px; }
     .card {
       background: linear-gradient(180deg, #423300 0%, #1c1600 100%);
@@ -74,10 +72,10 @@
       box-shadow: 4px 4px 0 #000;
     }
     .card.selected { border-color: #39ff14; box-shadow: 0 0 12px #39ff14, 4px 4px 0 #000; }
-    .card .ovr { font-size: 1.2rem; color: #ffd700; margin-bottom: 6px; text-shadow: 2px 2px 0 #000; }
-    .card .name { font-size: 0.7rem; color: #ffffff; margin-bottom: 6px; line-height: 1.3; }
-    .card .club { font-size: 0.55rem; color: #94a3b8; margin-bottom: 8px; }
-    .card .stats { font-size: 0.55rem; color: #39ff14; }
+    .card .ovr { font-size: 1.5rem; color: #ffd700; margin-bottom: 6px; text-shadow: 2px 2px 0 #000; }
+    .card .name { font-size: 0.95rem; color: #ffffff; margin-bottom: 6px; }
+    .card .club { font-size: 0.8rem; color: #94a3b8; margin-bottom: 8px; }
+    .card .stats { font-size: 0.8rem; color: #39ff14; }
     canvas {
       background: #1b7a35;
       border: 4px solid #ffffff;
@@ -87,17 +85,17 @@
       max-width: 100%;
     }
     input {
-      padding: 12px;
+      padding: 11px;
       border: 3px solid #ffffff;
       background: #090d16;
       color: #39ff14;
-      font-size: 0.75rem;
+      font-size: 0.95rem;
       text-align: center;
       width: 190px;
       box-shadow: 4px 4px 0 #000;
     }
     .scoreboard {
-      font-size: 0.85rem;
+      font-size: 1.1rem;
       margin-bottom: 10px;
       display: flex;
       justify-content: space-around;
@@ -105,7 +103,7 @@
       padding: 10px;
       border: 3px solid #ffffff;
     }
-    .status-msg { margin-top: 14px; color: #38bdf8; font-size: 0.65rem; line-height: 1.5; }
+    .status-msg { margin-top: 14px; color: #38bdf8; font-size: 0.85rem; line-height: 1.5; }
     .dpad {
       display: grid;
       grid-template-columns: repeat(3, 52px);
@@ -114,7 +112,7 @@
       justify-content: center;
       margin-top: 12px;
     }
-    .dpad button { padding: 0; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; }
+    .dpad button { padding: 0; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; }
   </style>
 </head>
 <body>
@@ -125,9 +123,9 @@
   </header>
 
   <nav>
-    <button onclick="showTab('playMenu')">PLAY MATCH</button>
-    <button onclick="showTab('utMenu')" class="secondary">ULTIMATE TEAM</button>
-    <button onclick="showTab('clubsMenu')" class="secondary">REAL CLUBS</button>
+    <button type="button" onclick="showTab('playMenu')">PLAY MATCH</button>
+    <button type="button" onclick="showTab('utMenu')" class="secondary">ULTIMATE TEAM</button>
+    <button type="button" onclick="showTab('clubsMenu')" class="secondary">REAL CLUBS</button>
   </nav>
 
   <!-- PLAY MENU -->
@@ -136,17 +134,17 @@
     <p style="margin-bottom: 18px;">WIN MATCHES TO EARN 500 COINS FOR PACKS!</p>
     
     <div style="display:flex; gap:14px; justify-content:center; flex-wrap:wrap; margin-bottom:22px;">
-      <button onclick="startMatch('CPU')">1P VS CPU</button>
-      <button onclick="startMatch('LOCAL2P')">2P SAME KEYBOARD</button>
+      <button type="button" onclick="startMatch('CPU')">1P VS CPU</button>
+      <button type="button" onclick="startMatch('LOCAL2P')">2P SAME KEYBOARD</button>
     </div>
 
     <div style="border-top: 3px dashed #475569; padding-top: 18px;">
-      <h2>ONLINE 1V1 ROOM CODE</h2>
-      <p style="margin-bottom: 14px;">CREATE A CODE AND SEND IT TO YOUR FRIEND.</p>
+      <h2>2-PLAYER ROOM CODE</h2>
+      <p style="margin-bottom: 14px;">GENERATE A 4-DIGIT CODE TO START A 2P MATCH.</p>
       <div style="display:flex; gap:10px; justify-content:center; align-items:center; flex-wrap:wrap;">
-        <button onclick="hostOnlineGame()" class="gold">CREATE CODE</button>
+        <button type="button" onclick="createRoomCode()" class="gold">CREATE CODE</button>
         <input type="text" id="joinCodeInput" placeholder="4-DIGIT CODE" maxlength="4" />
-        <button onclick="joinOnlineGame()" class="secondary">JOIN ROOM</button>
+        <button type="button" onclick="joinRoomCode()" class="secondary">JOIN ROOM</button>
       </div>
       <div id="onlineStatus" class="status-msg"></div>
     </div>
@@ -156,8 +154,8 @@
   <div id="utMenu" class="panel">
     <h2>ULTIMATE TEAM SQUAD</h2>
     <p>TAP A CARD TO SET YOUR ACTIVE STRIKER.</p>
-    <button onclick="openPack()" class="gold" style="margin: 16px 0;">OPEN GOLD PACK (500 COINS)</button>
-    <div id="packResult" style="color:#39ff14; font-size:0.65rem; min-height:20px; line-height:1.5;"></div>
+    <button type="button" onclick="openPack()" class="gold" style="margin: 16px 0;">OPEN GOLD PACK (500 COINS)</button>
+    <div id="packResult" style="color:#39ff14; font-size:0.85rem; min-height:22px;"></div>
     <div class="grid" id="myClubGrid"></div>
   </div>
 
@@ -176,20 +174,20 @@
       <span id="p2Label">P2: 0</span>
     </div>
     <canvas id="pitch" width="800" height="450"></canvas>
-    <p>P1: WASD OR D-PAD | P2 LOCAL: ARROWS</p>
+    <p>P1: WASD OR D-PAD | P2: ARROW KEYS</p>
     <div class="dpad">
       <div></div>
-      <button id="padUp">▲</button>
+      <button type="button" id="padUp">▲</button>
       <div></div>
-      <button id="padLeft">◄</button>
-      <button id="padDown">▼</button>
-      <button id="padRight">►</button>
+      <button type="button" id="padLeft">◄</button>
+      <button type="button" id="padDown">▼</button>
+      <button type="button" id="padRight">►</button>
     </div>
-    <button onclick="endMatchEarly()" class="secondary" style="margin-top:16px;">QUIT MATCH</button>
+    <button type="button" onclick="endMatchEarly()" class="secondary" style="margin-top:16px;">QUIT MATCH</button>
   </div>
 
 <script>
-  const PLAYER_POOL = [
+  var PLAYER_POOL = [
     { id: 1, name: "KYLIAN MBAPPE", club: "REAL MADRID", ovr: 91, speed: 5.7, power: 1.25 },
     { id: 2, name: "ERLING HAALAND", club: "MAN CITY", ovr: 91, speed: 5.1, power: 1.38 },
     { id: 3, name: "VINICIUS JR", club: "REAL MADRID", ovr: 90, speed: 5.6, power: 1.2 },
@@ -203,12 +201,16 @@
     { id: 11, name: "8-BIT ROOKIE", club: "FC 8-BIT ACADEMY", ovr: 75, speed: 4.3, power: 1.05 }
   ];
 
-  let coins = 1500;
-  let myPlayers = PLAYER_POOL.slice(-1);
-  let activePlayer = PLAYER_POOL.slice(-1).pop();
+  var coins = 1500;
+  var myPlayers = PLAYER_POOL.slice(-1);
+  var activePlayer = PLAYER_POOL.slice(-1).pop();
+  var activeRoomCode = "";
 
   function showTab(tabId) {
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    var panels = document.querySelectorAll('.panel');
+    for (var i = 0; i < panels.length; i++) {
+      panels.item(i).classList.remove('active');
+    }
     document.getElementById(tabId).classList.add('active');
     if (tabId === 'utMenu') renderMyClub();
     if (tabId === 'clubsMenu') renderRealClubs();
@@ -225,31 +227,32 @@
       return;
     }
     updateCoins(-500);
-    const pool = PLAYER_POOL.slice(0, 10);
-    const pulled = pool.slice(Math.floor(Math.random() * pool.length)).shift();
-    if (!myPlayers.some(p => p.id === pulled.id)) {
-      myPlayers.push(pulled);
+    var pool = PLAYER_POOL.slice(0, 10);
+    var pulled = pool.slice(Math.floor(Math.random() * pool.length)).shift();
+    var exists = false;
+    for (var i = 0; i < myPlayers.length; i++) {
+      if (myPlayers.at(i).id === pulled.id) exists = true;
     }
+    if (!exists) myPlayers.push(pulled);
     activePlayer = pulled;
     document.getElementById('packResult').innerText = "WALKOUT! PACKED " + pulled.name + " (" + pulled.ovr + " OVR)!";
     renderMyClub();
   }
 
   function renderMyClub() {
-    const grid = document.getElementById('myClubGrid');
+    var grid = document.getElementById('myClubGrid');
     grid.innerHTML = '';
-    myPlayers.forEach(p => {
-      const div = document.createElement('div');
+    myPlayers.forEach(function(p) {
+      var div = document.createElement('div');
       div.className = 'card' + (activePlayer.id === p.id ? ' selected' : '');
       div.innerHTML = '<div class="ovr">' + p.ovr + '</div><div class="name">' + p.name + '</div><div class="club">' + p.club + '</div><div class="stats">SPD:' + Math.round(p.speed*16) + ' PWR:' + Math.round(p.power*70) + '</div>';
-      div.onclick = () => { activePlayer = p; renderMyClub(); };
+      div.onclick = function() { activePlayer = p; renderMyClub(); };
       grid.appendChild(div);
     });
   }
 
   function renderRealClubs() {
-    const grid = document.getElementById('realClubsGrid');
+    var grid = document.getElementById('realClubsGrid');
     grid.innerHTML = '';
-    PLAYER_POOL.slice(0, 10).forEach(p => {
-      const div = document.createElement('div');
-      div.className = 'card' + (activePlayer.id === p.id ? ' selected' : '');
+    PLAYER_POOL.slice(0, 10).forEach(function(p) {
+      var div = document.createElement('div');
