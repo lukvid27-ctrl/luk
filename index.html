@@ -2,113 +2,208 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>FC Ultimate Web - 2P & Online Soccer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>FC 8-bit Mobile</title>
+  <link href="https://googleapis.com" rel="stylesheet">
   <script src="https://unpkg.com"></script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    body { background: #0d1117; color: #ffffff; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
-    header { width: 100%; background: #161b22; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #2ea043; }
-    h1 { font-size: 1.5rem; color: #3fb950; letter-spacing: 1px; }
-    .coins { background: #21262d; padding: 8px 15px; border-radius: 20px; font-weight: bold; color: #f1e05a; border: 1px solid #f1e05a; }
-    nav { display: flex; gap: 10px; margin: 20px 0; flex-wrap: wrap; justify-content: center; }
-    button { background: #238636; color: white; border: none; padding: 10px 18px; border-radius: 6px; font-size: 0.95rem; font-weight: bold; cursor: pointer; transition: 0.2s; }
-    button:hover { background: #2ea043; }
-    button.secondary { background: #30363d; }
-    button.secondary:hover { background: #484f58; }
-    .panel { display: none; width: 95%; max-width: 900px; background: #161b22; padding: 25px; border-radius: 10px; border: 1px solid #30363d; text-align: center; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Press Start 2P', monospace; user-select: none; }
+    body {
+      background: repeating-linear-gradient(0deg, #0b1911 0px, #0b1911 16px, #0f2418 16px, #0f2418 32px);
+      color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding-bottom: 30px;
+    }
+    header {
+      width: 100%;
+      background: #141c2b;
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 4px solid #39ff14;
+      box-shadow: 0 4px 0 #000;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    h1 { font-size: 1.1rem; color: #39ff14; text-shadow: 3px 3px 0px #000; }
+    .coins {
+      background: #2b2100;
+      padding: 10px 14px;
+      border: 3px solid #ffd700;
+      color: #ffd700;
+      font-size: 0.75rem;
+      box-shadow: 3px 3px 0 #000;
+    }
+    nav { display: flex; gap: 12px; margin: 20px 10px; flex-wrap: wrap; justify-content: center; }
+    button {
+      background: #39ff14;
+      color: #000000;
+      border: 3px solid #ffffff;
+      padding: 12px 16px;
+      font-size: 0.7rem;
+      cursor: pointer;
+      box-shadow: 4px 4px 0px #000000;
+      transition: transform 0.05s;
+    }
+    button:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0px #000; }
+    button.secondary { background: #1e293b; color: #ffffff; border-color: #64748b; }
+    button.gold { background: #ffd700; color: #000000; border-color: #ffffff; }
+    .panel {
+      display: none;
+      width: 94%;
+      max-width: 860px;
+      background: #141c2b;
+      padding: 24px 18px;
+      border: 4px solid #ffffff;
+      box-shadow: 8px 8px 0px #000000;
+      text-align: center;
+    }
     .panel.active { display: block; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 15px; margin-top: 20px; }
-    .card { background: linear-gradient(135deg, #2b2310, #5c4814); border: 2px solid #d4af37; border-radius: 10px; padding: 15px; text-align: center; transition: transform 0.2s; }
-    .card:hover { transform: translateY(-5px); }
-    .card.selected { border-color: #3fb950; box-shadow: 0 0 15px #3fb950; }
-    .card .ovr { font-size: 1.8rem; font-weight: 900; color: #f1e05a; }
-    .card .name { font-size: 1.1rem; font-weight: bold; margin: 5px 0; }
-    .card .club { font-size: 0.85rem; color: #c9d1d9; }
-    .card .stats { font-size: 0.8rem; margin-top: 8px; color: #8b949e; }
-    canvas { background: #1e6b32; border: 4px solid #ffffff; border-radius: 8px; display: block; margin: 15px auto; max-width: 100%; }
-    input { padding: 10px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white; font-size: 1rem; text-align: center; width: 160px; }
-    .scoreboard { font-size: 1.5rem; font-weight: bold; margin-bottom: 10px; display: flex; justify-content: center; gap: 40px; }
-    .status-msg { margin-top: 10px; color: #58a6ff; font-weight: bold; }
+    h2 { font-size: 1rem; color: #ffd700; margin-bottom: 14px; text-shadow: 2px 2px 0 #000; }
+    p { font-size: 0.65rem; line-height: 1.6; color: #cbd5e1; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 14px; margin-top: 18px; }
+    .card {
+      background: linear-gradient(180deg, #423300 0%, #1c1600 100%);
+      border: 3px solid #ffd700;
+      padding: 14px 10px;
+      text-align: center;
+      cursor: pointer;
+      box-shadow: 4px 4px 0 #000;
+    }
+    .card:hover { transform: translateY(-3px); }
+    .card.selected { border-color: #39ff14; box-shadow: 0 0 12px #39ff14, 4px 4px 0 #000; }
+    .card .ovr { font-size: 1.2rem; color: #ffd700; margin-bottom: 6px; text-shadow: 2px 2px 0 #000; }
+    .card .name { font-size: 0.7rem; color: #ffffff; margin-bottom: 6px; line-height: 1.3; }
+    .card .club { font-size: 0.55rem; color: #94a3b8; margin-bottom: 8px; }
+    .card .stats { font-size: 0.55rem; color: #39ff14; }
+    canvas {
+      background: #1b7a35;
+      border: 4px solid #ffffff;
+      box-shadow: 6px 6px 0 #000;
+      display: block;
+      margin: 14px auto;
+      max-width: 100%;
+      image-rendering: pixelated;
+    }
+    input {
+      padding: 12px;
+      border: 3px solid #ffffff;
+      background: #090d16;
+      color: #39ff14;
+      font-size: 0.75rem;
+      text-align: center;
+      width: 190px;
+      box-shadow: 4px 4px 0 #000;
+    }
+    .scoreboard {
+      font-size: 0.85rem;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-around;
+      background: #090d16;
+      padding: 10px;
+      border: 3px solid #ffffff;
+    }
+    .status-msg { margin-top: 14px; color: #38bdf8; font-size: 0.65rem; line-height: 1.5; }
+    .dpad {
+      display: grid;
+      grid-template-columns: repeat(3, 52px);
+      grid-template-rows: repeat(2, 52px);
+      gap: 6px;
+      justify-content: center;
+      margin-top: 12px;
+    }
+    .dpad button { padding: 0; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; }
   </style>
 </head>
 <body>
 
   <header>
-    <h1>⚽ FC ULTIMATE WEB</h1>
-    <div class="coins">🪙 Coins: <span id="coinCount">1500</span></div>
+    <h1>⚽ FC 8-BIT MOBILE</h1>
+    <div class="coins">COINS: <span id="coinCount">1500</span></div>
   </header>
 
   <nav>
-    <button onclick="showTab('playMenu')">Play Match</button>
-    <button onclick="showTab('utMenu')" class="secondary">Ultimate Team & Packs</button>
-    <button onclick="showTab('clubsMenu')" class="secondary">Real Clubs</button>
+    <button id="btnTabPlay">PLAY MATCH</button>
+    <button id="btnTabUT" class="secondary">ULTIMATE TEAM</button>
+    <button id="btnTabClubs" class="secondary">REAL CLUBS</button>
   </nav>
 
   <!-- PLAY MENU -->
   <div id="playMenu" class="panel active">
-    <h2>Choose Match Mode</h2>
-    <p style="color:#8b949e; margin: 10px 0 20px;">Win matches to earn 500 Coins for Ultimate Team packs!</p>
+    <h2>SELECT MODE</h2>
+    <p style="margin-bottom: 18px;">WIN MATCHES TO EARN 500 COINS FOR PACKS!</p>
     
-    <div style="display:flex; gap:15px; justify-content:center; flex-wrap:wrap; margin-bottom:25px;">
-      <button onclick="startMatch('CPU')">1P vs CPU (Your Active Squad)</button>
-      <button onclick="startMatch('LOCAL2P')">2P Same Keyboard (WASD vs Arrows)</button>
+    <div style="display:flex; gap:14px; justify-content:center; flex-wrap:wrap; margin-bottom:22px;">
+      <button id="btnCpu">1P VS CPU</button>
+      <button id="btnLocal2p">2P SAME KEYBOARD</button>
     </div>
 
-    <hr style="border-color:#30363d; margin: 20px 0;">
-    <h3>🌐 Online 1v1 Room Code</h3>
-    <p style="color:#8b949e; font-size:0.9rem; margin: 8px 0 15px;">Create a room and send the 4-digit code to your friend.</p>
-    
-    <div style="display:flex; gap:10px; justify-content:center; align-items:center; flex-wrap:wrap;">
-      <button onclick="hostOnlineGame()">Create Room Code</button>
-      <span>OR</span>
-      <input type="text" id="joinCodeInput" placeholder="Enter 4-Digit Code" maxlength="4" />
-      <button onclick="joinOnlineGame()" class="secondary">Join Room</button>
+    <div style="border-top: 3px dashed #475569; padding-top: 18px;">
+      <h2>ONLINE 1V1 ROOM CODE</h2>
+      <p style="margin-bottom: 14px;">CREATE A CODE AND SEND IT TO YOUR FRIEND.</p>
+      <div style="display:flex; gap:10px; justify-content:center; align-items:center; flex-wrap:wrap;">
+        <button id="btnHost" class="gold">CREATE CODE</button>
+        <input type="text" id="joinCodeInput" placeholder="4-DIGIT CODE" maxlength="4" />
+        <button id="btnJoin" class="secondary">JOIN ROOM</button>
+      </div>
+      <div id="onlineStatus" class="status-msg"></div>
     </div>
-    <div id="onlineStatus" class="status-msg"></div>
   </div>
 
   <!-- ULTIMATE TEAM MENU -->
   <div id="utMenu" class="panel">
-    <h2>Ultimate Team Club</h2>
-    <p style="color:#8b949e; margin: 8px 0;">Click a player card to set them as your Active Striker on the pitch.</p>
-    <button onclick="openPack()" style="margin: 15px 0; background:#d4af37; color:#000;">🎁 Open Gold Player Pack (500 Coins)</button>
-    <div id="packResult" style="color:#3fb950; font-weight:bold; min-height:24px;"></div>
+    <h2>ULTIMATE TEAM SQUAD</h2>
+    <p>TAP A CARD TO SET YOUR ACTIVE STRIKER.</p>
+    <button id="btnOpenPack" class="gold" style="margin: 16px 0;">OPEN GOLD PACK (500 COINS)</button>
+    <div id="packResult" style="color:#39ff14; font-size:0.65rem; min-height:20px; line-height:1.5;"></div>
     <div class="grid" id="myClubGrid"></div>
   </div>
 
   <!-- REAL CLUBS MENU -->
   <div id="clubsMenu" class="panel">
-    <h2>Real Teams Quick-Select</h2>
-    <p style="color:#8b949e; margin: 8px 0;">Pick a real-world club to play with their star player immediately.</p>
+    <h2>REAL TEAMS</h2>
+    <p>PICK A CLUB TO PLAY WITH THEIR STAR PLAYER.</p>
     <div class="grid" id="realClubsGrid"></div>
   </div>
 
   <!-- GAME ARENA -->
   <div id="gameArena" class="panel">
     <div class="scoreboard">
-      <span id="p1Label">P1 (Blue): 0</span>
-      <span id="timerLabel">01:30</span>
-      <span id="p2Label">P2 (Red): 0</span>
+      <span id="p1Label">P1: 0</span>
+      <span id="timerLabel" style="color:#ffd700;">01:30</span>
+      <span id="p2Label">P2: 0</span>
     </div>
     <canvas id="pitch" width="800" height="450"></canvas>
-    <p style="color:#8b949e; font-size:0.85rem;">P1: W A S D to move | P2 (Local): Arrow Keys | Online: Use W A S D</p>
-    <button onclick="endMatchEarly()" class="secondary" style="margin-top:10px;">Quit Match</button>
+    <p>P1: WASD OR D-PAD | P2 LOCAL: ARROWS</p>
+    <div class="dpad">
+      <div></div>
+      <button id="padUp">▲</button>
+      <div></div>
+      <button id="padLeft">◄</button>
+      <button id="padDown">▼</button>
+      <button id="padRight">►</button>
+    </div>
+    <button id="btnQuit" class="secondary" style="margin-top:16px;">QUIT MATCH</button>
   </div>
 
 <script>
   const PLAYER_POOL = [
-    { id: 1, name: "Kylian Mbappé", club: "Real Madrid", ovr: 91, speed: 5.6, power: 1.25 },
-    { id: 2, name: "Erling Haaland", club: "Manchester City", ovr: 91, speed: 5.1, power: 1.35 },
-    { id: 3, name: "Vinícius Júnior", club: "Real Madrid", ovr: 90, speed: 5.5, power: 1.2 },
-    { id: 4, name: "Lionel Messi", club: "Inter Miami", ovr: 88, speed: 4.9, power: 1.3 },
-    { id: 5, name: "Cristiano Ronaldo", club: "Al Nassr", ovr: 86, speed: 4.8, power: 1.3 },
-    { id: 6, name: "Lamine Yamal", club: "FC Barcelona", ovr: 86, speed: 5.3, power: 1.15 },
-    { id: 7, name: "Jude Bellingham", club: "Real Madrid", ovr: 90, speed: 5.0, power: 1.25 },
-    { id: 8, name: "Mohamed Salah", club: "Liverpool", ovr: 89, speed: 5.3, power: 1.22 },
-    { id: 9, name: "Bukayo Saka", club: "Arsenal", ovr: 87, speed: 5.1, power: 1.18 },
-    { id: 10, name: "Harry Kane", club: "Bayern Munich", ovr: 90, speed: 4.6, power: 1.32 },
-    { id: 11, name: "Starter Striker", club: "FC Web Academy", ovr: 75, speed: 4.2, power: 1.0 }
+    { id: 1, name: "KYLIAN MBAPPE", club: "REAL MADRID", ovr: 91, speed: 5.7, power: 1.25 },
+    { id: 2, name: "ERLING HAALAND", club: "MAN CITY", ovr: 91, speed: 5.1, power: 1.38 },
+    { id: 3, name: "VINICIUS JR", club: "REAL MADRID", ovr: 90, speed: 5.6, power: 1.2 },
+    { id: 4, name: "LIONEL MESSI", club: "INTER MIAMI", ovr: 88, speed: 5.0, power: 1.32 },
+    { id: 5, name: "C. RONALDO", club: "AL NASSR", ovr: 86, speed: 4.9, power: 1.32 },
+    { id: 6, name: "LAMINE YAMAL", club: "FC BARCELONA", ovr: 86, speed: 5.4, power: 1.18 },
+    { id: 7, name: "J. BELLINGHAM", club: "REAL MADRID", ovr: 90, speed: 5.1, power: 1.25 },
+    { id: 8, name: "MOHAMED SALAH", club: "LIVERPOOL", ovr: 89, speed: 5.4, power: 1.24 },
+    { id: 9, name: "BUKAYO SAKA", club: "ARSENAL", ovr: 87, speed: 5.2, power: 1.2 },
+    { id: 10, name: "HARRY KANE", club: "BAYERN MUNICH", ovr: 90, speed: 4.7, power: 1.35 },
+    { id: 11, name: "8-BIT ROOKIE", club: "FC 8-BIT ACADEMY", ovr: 75, speed: 4.3, power: 1.05 }
   ];
 
   let coins = 1500;
@@ -129,7 +224,7 @@
 
   function openPack() {
     if (coins < 500) {
-      document.getElementById('packResult').innerText = "Not enough coins! Win matches to earn 500 coins.";
+      document.getElementById('packResult').innerText = "NOT ENOUGH COINS! WIN MATCHES TO EARN 500.";
       return;
     }
     updateCoins(-500);
@@ -139,7 +234,7 @@
       myPlayers.push(pulled);
     }
     activePlayer = pulled;
-    document.getElementById('packResult').innerText = `🎉 WALKOUT! You packed ${pulled.name} (${pulled.ovr} OVR - ${pulled.club})!`;
+    document.getElementById('packResult').innerText = `WALKOUT! PACKED ${pulled.name} (${pulled.ovr} OVR)!`;
     renderMyClub();
   }
 
@@ -149,7 +244,7 @@
     myPlayers.forEach(p => {
       const div = document.createElement('div');
       div.className = 'card' + (activePlayer.id === p.id ? ' selected' : '');
-      div.innerHTML = `<div class="ovr">${p.ovr}</div><div class="name">${p.name}</div><div class="club">${p.club}</div><div class="stats">SPD: ${Math.round(p.speed*17)} | PWR: ${Math.round(p.power*72)}</div>`;
+      div.innerHTML = `<div class="ovr">${p.ovr}</div><div class="name">${p.name}</div><div class="club">${p.club}</div><div class="stats">SPD:${Math.round(p.speed*16)} PWR:${Math.round(p.power*70)}</div>`;
       div.onclick = () => { activePlayer = p; renderMyClub(); };
       grid.appendChild(div);
     });
@@ -161,44 +256,4 @@
     PLAYER_POOL.slice(0, 10).forEach(p => {
       const div = document.createElement('div');
       div.className = 'card' + (activePlayer.id === p.id ? ' selected' : '');
-      div.innerHTML = `<div class="ovr">${p.club}</div><div class="name">${p.name}</div><div class="club">${p.ovr} OVR</div>`;
-      div.onclick = () => { activePlayer = p; alert(`Selected ${p.club} (${p.name})!`); renderRealClubs(); };
-      grid.appendChild(div);
-    });
-  }
-
-  let peer = null;
-  let conn = null;
-  let isHost = false;
-  let remoteKeys = {};
-
-  function hostOnlineGame() {
-    const roomCode = Math.floor(1000 + Math.random() * 9000).toString();
-    document.getElementById('onlineStatus').innerText = "Generating room...";
-    peer = new Peer('fcweb-' + roomCode);
-    peer.on('open', () => {
-      isHost = true;
-      document.getElementById('onlineStatus').innerText = `✅ Room Created! Share Code: ${roomCode} (Waiting for opponent...)`;
-    });
-    peer.on('connection', (connection) => {
-      conn = connection;
-      setupConnection();
-      startMatch('ONLINE_HOST');
-    });
-  }
-
-  function joinOnlineGame() {
-    const code = document.getElementById('joinCodeInput').value.trim();
-    if (code.length !== 4) return alert("Enter a 4-digit room code.");
-    document.getElementById('onlineStatus').innerText = "Connecting to room...";
-    peer = new Peer();
-    peer.on('open', () => {
-      isHost = false;
-      conn = peer.connect('fcweb-' + code);
-      conn.on('open', () => {
-        setupConnection();
-        startMatch('ONLINE_CLIENT');
-      });
-    });
-  }
-
+      div.innerHTML = `<div class="ovr">${p.ovr}</div><div class="name">${p.club}</div><div class="club">${p.name}</div><div class="stats">TAP TO SELECT</div>`;
