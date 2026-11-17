@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>FC 8-bit Mobile</title>
   <link href="https://googleapis.com" rel="stylesheet">
   <script src="https://unpkg.com"></script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Press Start 2P', monospace; user-select: none; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Press Start 2P', monospace; }
     body {
       background: repeating-linear-gradient(0deg, #0b1911 0px, #0b1911 16px, #0f2418 16px, #0f2418 32px);
       color: #ffffff;
@@ -47,7 +47,6 @@
       font-size: 0.7rem;
       cursor: pointer;
       box-shadow: 4px 4px 0px #000000;
-      transition: transform 0.05s;
     }
     button:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0px #000; }
     button.secondary { background: #1e293b; color: #ffffff; border-color: #64748b; }
@@ -74,7 +73,6 @@
       cursor: pointer;
       box-shadow: 4px 4px 0 #000;
     }
-    .card:hover { transform: translateY(-3px); }
     .card.selected { border-color: #39ff14; box-shadow: 0 0 12px #39ff14, 4px 4px 0 #000; }
     .card .ovr { font-size: 1.2rem; color: #ffd700; margin-bottom: 6px; text-shadow: 2px 2px 0 #000; }
     .card .name { font-size: 0.7rem; color: #ffffff; margin-bottom: 6px; line-height: 1.3; }
@@ -87,7 +85,6 @@
       display: block;
       margin: 14px auto;
       max-width: 100%;
-      image-rendering: pixelated;
     }
     input {
       padding: 12px;
@@ -128,9 +125,9 @@
   </header>
 
   <nav>
-    <button id="btnTabPlay">PLAY MATCH</button>
-    <button id="btnTabUT" class="secondary">ULTIMATE TEAM</button>
-    <button id="btnTabClubs" class="secondary">REAL CLUBS</button>
+    <button onclick="showTab('playMenu')">PLAY MATCH</button>
+    <button onclick="showTab('utMenu')" class="secondary">ULTIMATE TEAM</button>
+    <button onclick="showTab('clubsMenu')" class="secondary">REAL CLUBS</button>
   </nav>
 
   <!-- PLAY MENU -->
@@ -139,17 +136,17 @@
     <p style="margin-bottom: 18px;">WIN MATCHES TO EARN 500 COINS FOR PACKS!</p>
     
     <div style="display:flex; gap:14px; justify-content:center; flex-wrap:wrap; margin-bottom:22px;">
-      <button id="btnCpu">1P VS CPU</button>
-      <button id="btnLocal2p">2P SAME KEYBOARD</button>
+      <button onclick="startMatch('CPU')">1P VS CPU</button>
+      <button onclick="startMatch('LOCAL2P')">2P SAME KEYBOARD</button>
     </div>
 
     <div style="border-top: 3px dashed #475569; padding-top: 18px;">
       <h2>ONLINE 1V1 ROOM CODE</h2>
       <p style="margin-bottom: 14px;">CREATE A CODE AND SEND IT TO YOUR FRIEND.</p>
       <div style="display:flex; gap:10px; justify-content:center; align-items:center; flex-wrap:wrap;">
-        <button id="btnHost" class="gold">CREATE CODE</button>
+        <button onclick="hostOnlineGame()" class="gold">CREATE CODE</button>
         <input type="text" id="joinCodeInput" placeholder="4-DIGIT CODE" maxlength="4" />
-        <button id="btnJoin" class="secondary">JOIN ROOM</button>
+        <button onclick="joinOnlineGame()" class="secondary">JOIN ROOM</button>
       </div>
       <div id="onlineStatus" class="status-msg"></div>
     </div>
@@ -159,7 +156,7 @@
   <div id="utMenu" class="panel">
     <h2>ULTIMATE TEAM SQUAD</h2>
     <p>TAP A CARD TO SET YOUR ACTIVE STRIKER.</p>
-    <button id="btnOpenPack" class="gold" style="margin: 16px 0;">OPEN GOLD PACK (500 COINS)</button>
+    <button onclick="openPack()" class="gold" style="margin: 16px 0;">OPEN GOLD PACK (500 COINS)</button>
     <div id="packResult" style="color:#39ff14; font-size:0.65rem; min-height:20px; line-height:1.5;"></div>
     <div class="grid" id="myClubGrid"></div>
   </div>
@@ -188,7 +185,7 @@
       <button id="padDown">▼</button>
       <button id="padRight">►</button>
     </div>
-    <button id="btnQuit" class="secondary" style="margin-top:16px;">QUIT MATCH</button>
+    <button onclick="endMatchEarly()" class="secondary" style="margin-top:16px;">QUIT MATCH</button>
   </div>
 
 <script>
@@ -207,8 +204,8 @@
   ];
 
   let coins = 1500;
-  let myPlayers = [PLAYER_POOL[10]];
-  let activePlayer = PLAYER_POOL[10];
+  let myPlayers = PLAYER_POOL.slice(-1);
+  let activePlayer = PLAYER_POOL.slice(-1).pop();
 
   function showTab(tabId) {
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
@@ -229,12 +226,12 @@
     }
     updateCoins(-500);
     const pool = PLAYER_POOL.slice(0, 10);
-    const pulled = pool[Math.floor(Math.random() * pool.length)];
+    const pulled = pool.slice(Math.floor(Math.random() * pool.length)).shift();
     if (!myPlayers.some(p => p.id === pulled.id)) {
       myPlayers.push(pulled);
     }
     activePlayer = pulled;
-    document.getElementById('packResult').innerText = `WALKOUT! PACKED ${pulled.name} (${pulled.ovr} OVR)!`;
+    document.getElementById('packResult').innerText = "WALKOUT! PACKED " + pulled.name + " (" + pulled.ovr + " OVR)!";
     renderMyClub();
   }
 
@@ -244,7 +241,7 @@
     myPlayers.forEach(p => {
       const div = document.createElement('div');
       div.className = 'card' + (activePlayer.id === p.id ? ' selected' : '');
-      div.innerHTML = `<div class="ovr">${p.ovr}</div><div class="name">${p.name}</div><div class="club">${p.club}</div><div class="stats">SPD:${Math.round(p.speed*16)} PWR:${Math.round(p.power*70)}</div>`;
+      div.innerHTML = '<div class="ovr">' + p.ovr + '</div><div class="name">' + p.name + '</div><div class="club">' + p.club + '</div><div class="stats">SPD:' + Math.round(p.speed*16) + ' PWR:' + Math.round(p.power*70) + '</div>';
       div.onclick = () => { activePlayer = p; renderMyClub(); };
       grid.appendChild(div);
     });
@@ -256,4 +253,3 @@
     PLAYER_POOL.slice(0, 10).forEach(p => {
       const div = document.createElement('div');
       div.className = 'card' + (activePlayer.id === p.id ? ' selected' : '');
-      div.innerHTML = `<div class="ovr">${p.ovr}</div><div class="name">${p.club}</div><div class="club">${p.name}</div><div class="stats">TAP TO SELECT</div>`;
