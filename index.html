@@ -1,258 +1,1444 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>FC 8-bit Mobile</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Courier New', Courier, monospace; font-weight: bold; }
-    body {
-      background: repeating-linear-gradient(0deg, #0b1911 0px, #0b1911 16px, #0f2418 16px, #0f2418 32px);
-      color: #ffffff;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      min-height: 100vh;
-      padding-bottom: 30px;
-    }
-    header {
-      width: 100%;
-      background: #141c2b;
-      padding: 16px 24px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 4px solid #39ff14;
-      box-shadow: 0 4px 0 #000;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-    h1 { font-size: 1.4rem; color: #39ff14; text-shadow: 2px 2px 0px #000; letter-spacing: 1px; }
-    .coins {
-      background: #2b2100;
-      padding: 8px 14px;
-      border: 3px solid #ffd700;
-      color: #ffd700;
-      font-size: 0.95rem;
-      box-shadow: 3px 3px 0 #000;
-    }
-    nav { display: flex; gap: 12px; margin: 20px 10px; flex-wrap: wrap; justify-content: center; }
-    button {
-      background: #39ff14;
-      color: #000000;
-      border: 3px solid #ffffff;
-      padding: 12px 18px;
-      font-size: 0.9rem;
-      cursor: pointer;
-      box-shadow: 4px 4px 0px #000000;
-    }
-    button:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0px #000; }
-    button.secondary { background: #1e293b; color: #ffffff; border-color: #64748b; }
-    button.gold { background: #ffd700; color: #000000; border-color: #ffffff; }
-    .panel {
-      display: none;
-      width: 94%;
-      max-width: 860px;
-      background: #141c2b;
-      padding: 24px 18px;
-      border: 4px solid #ffffff;
-      box-shadow: 8px 8px 0px #000000;
-      text-align: center;
-    }
-    .panel.active { display: block; }
-    h2 { font-size: 1.2rem; color: #ffd700; margin-bottom: 12px; text-shadow: 2px 2px 0 #000; }
-    p { font-size: 0.85rem; line-height: 1.5; color: #cbd5e1; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 14px; margin-top: 18px; }
-    .card {
-      background: linear-gradient(180deg, #423300 0%, #1c1600 100%);
-      border: 3px solid #ffd700;
-      padding: 14px 10px;
-      text-align: center;
-      cursor: pointer;
-      box-shadow: 4px 4px 0 #000;
-    }
-    .card.selected { border-color: #39ff14; box-shadow: 0 0 12px #39ff14, 4px 4px 0 #000; }
-    .card .ovr { font-size: 1.5rem; color: #ffd700; margin-bottom: 6px; text-shadow: 2px 2px 0 #000; }
-    .card .name { font-size: 0.95rem; color: #ffffff; margin-bottom: 6px; }
-    .card .club { font-size: 0.8rem; color: #94a3b8; margin-bottom: 8px; }
-    .card .stats { font-size: 0.8rem; color: #39ff14; }
-    canvas {
-      background: #1b7a35;
-      border: 4px solid #ffffff;
-      box-shadow: 6px 6px 0 #000;
-      display: block;
-      margin: 14px auto;
-      max-width: 100%;
-    }
-    input {
-      padding: 11px;
-      border: 3px solid #ffffff;
-      background: #090d16;
-      color: #39ff14;
-      font-size: 0.95rem;
-      text-align: center;
-      width: 190px;
-      box-shadow: 4px 4px 0 #000;
-    }
-    .scoreboard {
-      font-size: 1.1rem;
-      margin-bottom: 10px;
-      display: flex;
-      justify-content: space-around;
-      background: #090d16;
-      padding: 10px;
-      border: 3px solid #ffffff;
-    }
-    .status-msg { margin-top: 14px; color: #38bdf8; font-size: 0.85rem; line-height: 1.5; }
-    .dpad {
-      display: grid;
-      grid-template-columns: repeat(3, 52px);
-      grid-template-rows: repeat(2, 52px);
-      gap: 6px;
-      justify-content: center;
-      margin-top: 12px;
-    }
-    .dpad button { padding: 0; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; }
-  </style>
-</head>
-<body>
+'use strict';
+/* ==========================================================================
+   FC SOCCER BROS - game.js
+   Part 1: engine (audio, input, 11v11 physics, AI, rendering, netcode snapshots)
+   Part 2: menus & game modes (loading screen, Quick Match, Online, World Cup, Story, Ultimate Team)
+   ========================================================================== */
 
-  <header>
-    <h1>⚽ FC 8-BIT MOBILE</h1>
-    <div class="coins">COINS: <span id="coinCount">1500</span></div>
-  </header>
+const $ = s => document.querySelector(s);
+const canvas = $('#game'), ctx = canvas.getContext('2d');
+const uiEl = $('#ui');
+const W = 960, H = 540;                 // canvas size
+const PW = 840, PD = 300;               // pitch length (x) and depth (y) in world units
+const GY0 = 112, GY1 = 188, GYC = 150;  // goal mouth (y range) and centre
+const CROSS = 62;                       // crossbar height
+const STEP = 1 / 60;
+const DEPTH_K = 0.62;                   // squash of depth velocity so shots feel 2.5D
+const SPR = 0.8;                        // sprite scale (22 players share the pitch)
 
-  <nav>
-    <button type="button" onclick="showTab('playMenu')">PLAY MATCH</button>
-    <button type="button" onclick="showTab('utMenu')" class="secondary">ULTIMATE TEAM</button>
-    <button type="button" onclick="showTab('clubsMenu')" class="secondary">REAL CLUBS</button>
-  </nav>
+const rnd = (a, b) => a + Math.random() * (b - a);
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
-  <!-- PLAY MENU -->
-  <div id="playMenu" class="panel active">
-    <h2>SELECT MODE</h2>
-    <p style="margin-bottom: 18px;">WIN MATCHES TO EARN 500 COINS FOR PACKS!</p>
-    
-    <div style="display:flex; gap:14px; justify-content:center; flex-wrap:wrap; margin-bottom:22px;">
-      <button type="button" onclick="startMatch('CPU')">1P VS CPU</button>
-      <button type="button" onclick="startMatch('LOCAL2P')">2P SAME KEYBOARD</button>
-    </div>
+// World -> screen projection (broadcast camera tilted down: far side is slightly smaller)
+function proj(x, y, z) {
+  const sc = 0.82 + 0.18 * (y / PD);
+  return { x: 480 + (x - PW / 2) * sc, y: 212 + y * 1.02 - (z || 0) * sc, sc };
+}
 
-    <div style="border-top: 3px dashed #475569; padding-top: 18px;">
-      <h2>2-PLAYER ROOM CODE</h2>
-      <p style="margin-bottom: 14px;">GENERATE A 4-DIGIT CODE TO START A 2P MATCH.</p>
-      <div style="display:flex; gap:10px; justify-content:center; align-items:center; flex-wrap:wrap;">
-        <button type="button" onclick="createRoomCode()" class="gold">CREATE CODE</button>
-        <input type="text" id="joinCodeInput" placeholder="4-DIGIT CODE" maxlength="4" />
-        <button type="button" onclick="joinRoomCode()" class="secondary">JOIN ROOM</button>
-      </div>
-      <div id="onlineStatus" class="status-msg"></div>
-    </div>
-  </div>
-
-  <!-- ULTIMATE TEAM MENU -->
-  <div id="utMenu" class="panel">
-    <h2>ULTIMATE TEAM SQUAD</h2>
-    <p>TAP A CARD TO SET YOUR ACTIVE STRIKER.</p>
-    <button type="button" onclick="openPack()" class="gold" style="margin: 16px 0;">OPEN GOLD PACK (500 COINS)</button>
-    <div id="packResult" style="color:#39ff14; font-size:0.85rem; min-height:22px;"></div>
-    <div class="grid" id="myClubGrid"></div>
-  </div>
-
-  <!-- REAL CLUBS MENU -->
-  <div id="clubsMenu" class="panel">
-    <h2>REAL TEAMS</h2>
-    <p>PICK A CLUB TO PLAY WITH THEIR STAR PLAYER.</p>
-    <div class="grid" id="realClubsGrid"></div>
-  </div>
-
-  <!-- GAME ARENA -->
-  <div id="gameArena" class="panel">
-    <div class="scoreboard">
-      <span id="p1Label">P1: 0</span>
-      <span id="timerLabel" style="color:#ffd700;">01:30</span>
-      <span id="p2Label">P2: 0</span>
-    </div>
-    <canvas id="pitch" width="800" height="450"></canvas>
-    <p>P1: WASD OR D-PAD | P2: ARROW KEYS</p>
-    <div class="dpad">
-      <div></div>
-      <button type="button" id="padUp">▲</button>
-      <div></div>
-      <button type="button" id="padLeft">◄</button>
-      <button type="button" id="padDown">▼</button>
-      <button type="button" id="padRight">►</button>
-    </div>
-    <button type="button" onclick="endMatchEarly()" class="secondary" style="margin-top:16px;">QUIT MATCH</button>
-  </div>
-
-<script>
-  var PLAYER_POOL = [
-    { id: 1, name: "KYLIAN MBAPPE", club: "REAL MADRID", ovr: 91, speed: 5.7, power: 1.25 },
-    { id: 2, name: "ERLING HAALAND", club: "MAN CITY", ovr: 91, speed: 5.1, power: 1.38 },
-    { id: 3, name: "VINICIUS JR", club: "REAL MADRID", ovr: 90, speed: 5.6, power: 1.2 },
-    { id: 4, name: "LIONEL MESSI", club: "INTER MIAMI", ovr: 88, speed: 5.0, power: 1.32 },
-    { id: 5, name: "C. RONALDO", club: "AL NASSR", ovr: 86, speed: 4.9, power: 1.32 },
-    { id: 6, name: "LAMINE YAMAL", club: "FC BARCELONA", ovr: 86, speed: 5.4, power: 1.18 },
-    { id: 7, name: "J. BELLINGHAM", club: "REAL MADRID", ovr: 90, speed: 5.1, power: 1.25 },
-    { id: 8, name: "MOHAMED SALAH", club: "LIVERPOOL", ovr: 89, speed: 5.4, power: 1.24 },
-    { id: 9, name: "BUKAYO SAKA", club: "ARSENAL", ovr: 87, speed: 5.2, power: 1.2 },
-    { id: 10, name: "HARRY KANE", club: "BAYERN MUNICH", ovr: 90, speed: 4.7, power: 1.35 },
-    { id: 11, name: "8-BIT ROOKIE", club: "FC 8-BIT ACADEMY", ovr: 75, speed: 4.3, power: 1.05 }
-  ];
-
-  var coins = 1500;
-  var myPlayers = PLAYER_POOL.slice(-1);
-  var activePlayer = PLAYER_POOL.slice(-1).pop();
-  var activeRoomCode = "";
-
-  function showTab(tabId) {
-    var panels = document.querySelectorAll('.panel');
-    for (var i = 0; i < panels.length; i++) {
-      panels.item(i).classList.remove('active');
+/* ============================== AUDIO ================================== */
+const Snd = (() => {
+  let ac = null, out = null;
+  function init() {
+    if (!ac) {
+      try { ac = new (window.AudioContext || window.webkitAudioContext)(); out = ac.createGain(); out.gain.value = 0.55; out.connect(ac.destination); }
+      catch (e) { ac = null; }
     }
-    document.getElementById(tabId).classList.add('active');
-    if (tabId === 'utMenu') renderMyClub();
-    if (tabId === 'clubsMenu') renderRealClubs();
+    if (ac && ac.state === 'suspended') ac.resume();
+  }
+  function tone(f, dur, type, vol, f2, delay) {
+    if (!ac) return;
+    const t = ac.currentTime + (delay || 0), o = ac.createOscillator(), g = ac.createGain();
+    o.type = type || 'sine'; o.frequency.setValueAtTime(f, t);
+    if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(out); o.start(t); o.stop(t + dur + 0.03);
+  }
+  function noise(dur, vol, ftype, f1, f2, delay, attack) {
+    if (!ac) return;
+    const t = ac.currentTime + (delay || 0), n = Math.floor(ac.sampleRate * dur);
+    const buf = ac.createBuffer(1, n, ac.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    const s = ac.createBufferSource(); s.buffer = buf;
+    const f = ac.createBiquadFilter(); f.type = ftype; f.frequency.setValueAtTime(f1, t);
+    if (f2) f.frequency.exponentialRampToValueAtTime(f2, t + dur);
+    const g = ac.createGain(); g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + (attack || 0.005)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f); f.connect(g); g.connect(out); s.start(t);
+  }
+  return {
+    init,
+    kick(p) { p = p || 0.5; tone(120 + 90 * p, 0.12, 'sine', 0.7, 45); noise(0.06, 0.25 + 0.3 * p, 'lowpass', 1400); },
+    thud() { tone(90, 0.1, 'sine', 0.5, 40); },
+    swish() { noise(0.55, 0.5, 'bandpass', 3200, 800); },
+    whistle() { tone(2900, 0.3, 'square', 0.1); tone(3150, 0.3, 'square', 0.08, null, 0.03); },
+    roar() { noise(2.4, 0.38, 'bandpass', 650, 1300, 0, 0.9); },
+    chime() { [660, 880, 1320, 1760].forEach((f, i) => tone(f, 0.55, 'triangle', 0.2, null, i * 0.09)); },
+    save() { noise(0.14, 0.4, 'highpass', 1600); tone(230, 0.1, 'square', 0.15, 120); },
+    post() { tone(950, 0.28, 'triangle', 0.4, 650); },
+    tick() { tone(700, 0.05, 'square', 0.08); },
+    coin() { tone(988, 0.08, 'square', 0.12); tone(1319, 0.2, 'square', 0.12, null, 0.08); },
+  };
+})();
+
+/* ============================== INPUT ================================== */
+// CONTROLS: Arrows move. SPACE = shoot (hold to charge) / slide tackle without the ball.
+//           SPACE while holding UP or DOWN = PASS in that direction (hold C as well for a lobbed ball).
+//           C = jump, Shift = sprint, X = switch player (auto-switch teams only).
+const keys = {};
+const typing = () => document.activeElement && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName);
+addEventListener('keydown', e => {
+  if (typing()) return;
+  keys[e.code] = true;
+  if (/^(Arrow|Space|Tab)/.test(e.code)) e.preventDefault();
+  Snd.init();
+  if (e.code === 'Escape' || e.code === 'KeyP') { if (cur && !cur.net) togglePause(); }
+}, { passive: false });
+addEventListener('keyup', e => { keys[e.code] = false; });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+
+// NOTE: ctl.edge.passP means "switch player" (the pass itself is Space + Up/Down).
+const SCHEMES = {
+  solo: { up: ['ArrowUp', 'KeyW'], down: ['ArrowDown', 'KeyS'], left: ['ArrowLeft', 'KeyA'], right: ['ArrowRight', 'KeyD'], shoot: ['Space', 'Enter'], jump: ['KeyC', 'KeyE'], pass: ['KeyX', 'KeyZ'], lob: [], sprint: ['ShiftLeft', 'ShiftRight'] },
+  p1: { up: ['KeyW'], down: ['KeyS'], left: ['KeyA'], right: ['KeyD'], shoot: ['Space'], jump: ['KeyE'], pass: ['KeyQ'], lob: [], sprint: ['ShiftLeft'] },
+  p2: { up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'], shoot: ['Enter'], jump: ['Period'], pass: ['Comma'], lob: [], sprint: ['ShiftRight'] },
+};
+function mkCtl(kind, scheme) { return { kind, scheme, held: {}, prev: {}, edge: {}, ev: {}, net: null }; }
+function pollCtl(c) {
+  let h;
+  if (c.kind === 'keys') {
+    const s = SCHEMES[c.scheme], any = a => a.some(k => keys[k]);
+    h = { mx: (any(s.right) ? 1 : 0) - (any(s.left) ? 1 : 0), my: (any(s.down) ? 1 : 0) - (any(s.up) ? 1 : 0), shoot: any(s.shoot), jump: any(s.jump), pass: any(s.pass), lob: false, sprint: any(s.sprint) };
+  } else h = c.net || { mx: 0, my: 0, shoot: false, jump: false, pass: false, lob: false, sprint: false };
+  c.edge = { shootP: h.shoot && !c.prev.shoot, shootR: !h.shoot && !!c.prev.shoot, jumpP: h.jump && !c.prev.jump, passP: h.pass && !c.prev.pass, lobP: false };
+  if (c.ev) {
+    if (c.ev.sp) c.edge.shootP = true; if (c.ev.sr) c.edge.shootR = true;
+    if (c.ev.jp) c.edge.jumpP = true; if (c.ev.pp) c.edge.passP = true;
+    c.ev = {};
+  }
+  c.prev = { shoot: h.shoot, jump: h.jump, pass: h.pass };
+  c.held = h;
+  return h;
+}
+
+/* ============================== KITS =================================== */
+function hexRGB(h) { h = h.replace('#', ''); if (h.length === 3) h = h.split('').map(c => c + c).join(''); return [parseInt(h.substr(0, 2), 16), parseInt(h.substr(2, 2), 16), parseInt(h.substr(4, 2), 16)]; }
+function colorDist(a, b) { const x = hexRGB(a), y = hexRGB(b); return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]); }
+function kitFor(teamId, vs) {
+  const T = TEAMS[teamId] || TEAMS.OTH; let c1 = T.c1, c2 = T.c2;
+  if (vs && colorDist(c1, vs.c1) < 120) { [c1, c2] = [c2, c1]; if (colorDist(c1, vs.c1) < 120) c1 = '#222222'; }
+  return { c1, c2, style: T.style || 'solid', sh: c2 };
+}
+
+/* ============================== MATCH ================================== */
+const DEFAULT_GK = { id: 'gk_default', name: 'Keeper', ovr: 74, pos: 'GK', nation: 'OTH', club: 'OTH', tier: 'Silver', stats: { pace: 60, shot: 50, pass: 60, def: 76, jump: 78 }, skinTone: '#e8b890', hairStyle: 'short', hairColor: '#1a1209' };
+// 4-3-3 formation, same order as SLOTS in players.js. fx = fraction of pitch from own goal, y = depth (team 0 view)
+const FORM = [
+  { fx: 0.20, y: 45 }, { fx: 0.17, y: 110 }, { fx: 0.17, y: 190 }, { fx: 0.20, y: 255 },   // LB CB CB RB
+  { fx: 0.36, y: 100 }, { fx: 0.36, y: 200 }, { fx: 0.44, y: 150 },                          // CM CM CAM
+  { fx: 0.45, y: 50 }, { fx: 0.47, y: 150 }, { fx: 0.45, y: 250 },                           // LW ST RW
+];
+const KICKER = 8; // ST takes the kickoff
+function spotFor(i, t) { const f = FORM[i]; return { x: t === 0 ? PW * f.fx : PW * (1 - f.fx), y: t === 0 ? f.y : PD - f.y }; }
+
+function mkPlayer(pd, t, i, spot, kit) {
+  return { pd, st: pd.stats, team: t, idx: i, isKeeper: false, human: null, x: spot.x, y: spot.y, z: 0, vx: 0, vy: 0, vz: 0, fx: t === 0 ? 1 : -1, fy: 0, home: { x: spot.x, y: spot.y }, stamina: 1, exhausted: false, charging: false, charge: 0, aimAng: 0, aiCharge: 0.8, slideT: 0, slideCd: 0, sfx: 1, sfy: 0, slideHit: false, cd: 0, poke: 0, kickAnim: 0, spin: 0, runPhase: Math.random() * 6, aiT: rnd(0, 0.5), kit, num: 1 + (hashStr(pd.name) % 98), beard: hashStr(pd.name) % 5 === 0 };
+}
+function mkKeeper(pd, t, kit) {
+  return { pd, st: pd.stats, team: t, idx: -1, isKeeper: true, x: t === 0 ? 12 : PW - 12, y: GYC, z: 0, vx: 0, vy: 0, vz: 0, fx: t === 0 ? 1 : -1, fy: 0, hold: 0, dive: 0, saveCd: 0, runPhase: 0, kit, num: 1, beard: false, slideT: 0, kickAnim: 0 };
+}
+
+/* cfg: { sides:[{team, lineup:[{pd} x10], gk}, {...}],
+          humans:[{ctl|null, team, idx, locked, label, color}],
+          lvls:[ai level team0, ai level team1], halfLen, golden, startScore, net:{role}, labels, guestCtl, onEnd, onQuit } */
+function createMatch(cfg) {
+  const m = {
+    cfg, time: cfg.halfLen || 120, half: 1, score: (cfg.startScore || [0, 0]).slice(), state: 'kickoff', stateT: 2.2,
+    players: [], keepers: [], tm: [], humans: cfg.humans.map(h => Object.assign({}, h)),
+    ball: { x: PW / 2, y: PD / 2, z: 0, vx: 0, vy: 0, vz: 0, turn: 0, turnT: 0, owner: null, last: null, fire: false, spin: 0 },
+    parts: [], popups: [], shake: 0, hitstop: 0, ended: false, golden: false, goldT: 0, pens: false, netRip: [0, 0], kickTeam: 0, clock: 0,
+    net: cfg.net || null, out: [], snapN: 0, guestCtl: cfg.guestCtl || null,
+  };
+  const kit0 = kitFor(cfg.sides[0].team, null), kits = [kit0, kitFor(cfg.sides[1].team, kit0)];
+  for (let t = 0; t < 2; t++) {
+    const side = cfg.sides[t];
+    const tm = { t, lvl: cfg.lvls ? cfg.lvls[t] : 1, players: [], kit: kits[t], chasers: [] };
+    side.lineup.forEach((e, i) => { const p = mkPlayer(e.pd, t, i, spotFor(i, t), kits[t]); tm.players.push(p); m.players.push(p); });
+    m.keepers.push(mkKeeper(side.gk || DEFAULT_GK, t, { c1: t === 0 ? '#2fe05a' : '#ff4fa0', c2: '#111111', style: 'solid', sh: '#111111' }));
+    m.tm.push(tm);
+  }
+  resetKickoff(m, 0);
+  return m;
+}
+
+function resetKickoff(m, kickTeam) {
+  m.kickTeam = kickTeam;
+  for (const tm of m.tm) tm.players.forEach(p => { p.x = p.home.x; p.y = p.home.y; p.z = 0; p.vx = p.vy = p.vz = 0; p.charging = false; p.charge = 0; p.slideT = 0; p.fx = p.team === 0 ? 1 : -1; p.fy = 0; p.cd = 0; });
+  m.keepers.forEach(k => { k.x = k.team === 0 ? 12 : PW - 12; k.y = GYC; k.hold = 0; });
+  const b = m.ball; b.x = PW / 2; b.y = PD / 2; b.z = 0; b.vx = b.vy = b.vz = 0; b.turn = 0; b.turnT = 0; b.fire = false; b.owner = null;
+  const kp = m.tm[kickTeam].players[KICKER]; kp.x = PW / 2 + (kickTeam === 0 ? -14 : 14); kp.y = PD / 2; b.owner = kp; b.last = kp;
+  m.state = 'kickoff'; m.stateT = 1.8;
+}
+
+/* ---------- events (sound/particles/banner), mirrored to online guests ---------- */
+function emit(m, type, d) { d = d || {}; handleEvent(m, type, d); if (m.net && m.net.role === 'host') m.out.push([type, d]); }
+let bannerTimer = 0;
+function showBanner(text, ms) { const el = $('#banner'); el.textContent = text; el.classList.add('show'); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => el.classList.remove('show'), ms || 1700); }
+function popup(m, text, x, y) { m.popups.push({ text, x, y, t: 1.2 }); }
+function burst(m, x, y, z, n, colors, spd, life, grav) {
+  for (let i = 0; i < n; i++) m.parts.push({ x, y, z, vx: rnd(-spd, spd), vy: rnd(-spd, spd) * 0.5, vz: rnd(spd * 0.2, spd), life: rnd(life * 0.6, life), max: life, c: Array.isArray(colors) ? pick(colors) : colors, s: rnd(1.5, 3.5), g: grav === undefined ? 500 : grav });
+}
+function handleEvent(m, type, d) {
+  switch (type) {
+    case 'kick': Snd.kick(d.p); break;
+    case 'power': Snd.kick(1); Snd.thud(); popup(m, 'POWER SHOT!', d.x, d.y); m.shake = Math.max(m.shake, 6); burst(m, d.x, d.y, 4, 14, ['#ffb703', '#fb5607', '#ffd166'], 130, 0.5, 100); break;
+    case 'goal': Snd.swish(); Snd.roar(); Snd.whistle(); showBanner('GOAL!', 2400); m.shake = 10; burst(m, d.x, d.y, 20, 60, ['#ffd23f', '#ef476f', '#06d6a0', '#4cc9f0', '#fff'], 220, 1.8, 260); break;
+    case 'save': Snd.save(); popup(m, 'SAVE!', d.x, d.y); break;
+    case 'post': Snd.post(); popup(m, 'OFF THE WOODWORK!', d.x, d.y); m.shake = Math.max(m.shake, 3); break;
+    case 'tackle': Snd.thud(); burst(m, d.x, d.y, 2, 10, ['#7a5230', '#4b8f35', '#9c7a4d'], 100, 0.5, 400); m.shake = Math.max(m.shake, 2); break;
+    case 'dirt': burst(m, d.x, d.y, 1, 2, ['#7a5230', '#4b8f35'], 40, 0.4, 300); break;
+    case 'trivela': popup(m, 'TRIVELA!', d.x, d.y); break;
+    case 'whistle': Snd.whistle(); break;
+    case 'banner': showBanner(d.t, d.ms); break;
+    case 'end': Snd.whistle(); Snd.whistle(); break;
+  }
+}
+
+/* ---------- ball helpers ---------- */
+function kickBall(m, p, dx, dy, speed, loft, turn, turnT, fire) {
+  const b = m.ball, l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
+  b.owner = null; b.vx = dx * speed; b.vy = dy * speed * DEPTH_K; b.vz = speed * loft; b.turn = turn || 0; b.turnT = turnT || 0; b.last = p; b.fire = !!fire;
+  b.x = p.x + dx * 9; b.y = p.y + dy * 4; b.z = Math.max(2, p.z);
+  p.cd = 0.3; p.kickAnim = 0.22; p.charging = false; p.charge = 0;
+  emit(m, 'kick', { p: clamp(speed / 650, 0.2, 1) });
+}
+function goalAngle(p) { const gx = p.team === 0 ? PW : 0; return Math.atan2((GYC - p.y) / DEPTH_K, gx - p.x); }
+function powerFactor(c) { return c < 0.88 ? 0.3 + 0.7 * (c / 0.88) : Math.max(0.55, 1 - (c - 0.88) * 2.4); }
+
+function fireShot(m, p, volley) {
+  const st = p.st, c = p.charge, atk = p.team === 0 ? 1 : -1;
+  const ang = goalAngle(p) + p.aimAng * atk;
+  const sweet = !volley && c >= 0.78 && c <= 0.88;
+  const speed = (200 + st.shot * 3.0) * powerFactor(volley ? 0.7 : c) * (sweet ? 1.28 : 1) * (volley ? 0.92 : 1);
+  const loft = volley ? 0.26 : (sweet ? 0.12 : 0.16);
+  const turn = -Math.sign(p.aimAng) * Math.min(Math.abs(p.aimAng), 0.5) * (st.shot / 99) * 1.2;
+  kickBall(m, p, Math.cos(ang), Math.sin(ang), speed, loft, turn, 0.9, sweet);
+  p.kickAnim = 0.28;
+  if (sweet) { m.hitstop = 0.08; emit(m, 'power', { x: m.ball.x, y: m.ball.y }); }
+}
+
+function segDist(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy || 1;
+  const t = clamp(((px - ax) * dx + (py - ay) * dy) / l2, 0, 1);
+  return Math.hypot(px - (ax + dx * t), py - (ay + dy * t));
+}
+function bestPassTarget(m, p, dir) {
+  const mates = m.tm[p.team].players, opps = m.tm[1 - p.team].players;
+  let best = null, bs = -1e9;
+  for (const q of mates) {
+    if (q === p) continue;
+    const dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy);
+    if (d < 40 || d > 420) continue;
+    const dot = (dx * dir.x + dy * dir.y) / d;
+    if (dot < 0.3) continue;
+    let open = 120; for (const o of opps) open = Math.min(open, segDist(o.x, o.y, p.x, p.y, q.x, q.y));
+    const s = dot * 100 - Math.abs(d - 200) * 0.1 + open * 0.3;
+    if (s > bs) { bs = s; best = q; }
+  }
+  return best;
+}
+function doPass(m, p, it, lob) {
+  const dir = (it.mx || it.my) ? (() => { const l = Math.hypot(it.mx, it.my * 0.8) || 1; return { x: it.mx / l, y: it.my * 0.8 / l }; })() : { x: p.fx, y: p.fy };
+  const q = bestPassTarget(m, p, dir);
+  if (!q) { kickBall(m, p, dir.x, dir.y, 250, 0, 0, 0, false); return; }
+  const tx = q.x + q.vx * 0.35, ty = q.y + q.vy * 0.35;
+  const dx = tx - p.x, dy = (ty - p.y) / DEPTH_K, d = Math.hypot(dx, dy);
+  let speed = clamp(190 + p.st.pass * 1.3 + d * 0.3, 230, 560), loft = 0.03, turn = 0, turnT = 0, ang = Math.atan2(dy, dx);
+  if (lob) { speed = clamp(d * 1.05 + 130, 270, 540); loft = clamp(260 * d / (speed * speed), 0.12, 1.0); }
+  else if (p.st.pass >= 95) {
+    // TRIVELA: outside-of-the-boot curl around the nearest defender
+    let nd = 1e9, no = null;
+    for (const o of m.tm[1 - p.team].players) { const sd = segDist(o.x, o.y, p.x, p.y, q.x, q.y); if (sd < nd) { nd = sd; no = o; } }
+    if (no && nd < 80) {
+      const cr = Math.cos(ang) * ((no.y - p.y) / DEPTH_K) - Math.sin(ang) * (no.x - p.x), s = cr >= 0 ? 1 : -1, delta = 0.32, T = d / speed;
+      ang -= s * delta; turn = s * 2 * delta / T; turnT = T;
+      emit(m, 'trivela', { x: p.x, y: p.y });
+    }
+  }
+  kickBall(m, p, Math.cos(ang), Math.sin(ang), speed, loft, turn, turnT, false);
+  if (p.human && !p.human.locked) p.human.idx = q.idx;
+}
+
+function startSlide(m, p) { p.slideT = 0.38; p.slideCd = 0.9; p.sfx = p.fx || (p.team === 0 ? 1 : -1); p.sfy = p.fy || 0; p.slideHit = false; p.charging = false; }
+
+function applyIntent(m, p, it, dt) {
+  const b = m.ball, st = p.st, has = b.owner === p;
+  p.cd = Math.max(0, p.cd - dt); p.poke = Math.max(0, p.poke - dt); p.slideCd = Math.max(0, p.slideCd - dt); p.kickAnim = Math.max(0, p.kickAnim - dt);
+
+  // ---- sliding ----
+  if (p.slideT > 0) {
+    p.slideT -= dt; const k = p.slideT / 0.38, sp = 120 + 260 * k;
+    p.vx = p.sfx * sp; p.vy = p.sfy * sp * 0.72;
+    p.x = clamp(p.x + p.vx * dt, 6, PW - 6); p.y = clamp(p.y + p.vy * dt, 6, PD - 6);
+    if (Math.random() < 0.5) emit(m, 'dirt', { x: p.x, y: p.y });
+    const reach = 14 + st.def * 0.13, o = b.owner;
+    if (!p.slideHit) {
+      if (o && o.team !== p.team && !o.isKeeper && Math.hypot(o.x - p.x, o.y - p.y) < reach && o.z < 14) {
+        p.slideHit = true; o.cd = 0.6; o.charging = false; o.charge = 0;
+        b.owner = null; b.vx = p.sfx * 170 + rnd(-30, 30); b.vy = p.sfy * 170 * DEPTH_K + rnd(-30, 30); b.vz = 40; b.last = p; b.turn = 0;
+        emit(m, 'tackle', { x: p.x, y: p.y });
+      } else if (!o && Math.hypot(b.x - p.x, b.y - p.y) < reach + 4 && b.z < 20) {
+        p.slideHit = true; b.vx = p.sfx * 250; b.vy = p.sfy * 250 * DEPTH_K; b.vz = 30; b.last = p; b.turn = 0;
+        emit(m, 'tackle', { x: p.x, y: p.y });
+      }
+    }
+    return;
   }
 
-  function updateCoins(amount) {
-    coins += amount;
-    document.getElementById('coinCount').innerText = coins;
-  }
+  const canSprint = it.sprint && p.stamina > (p.exhausted ? 0.25 : 0.02) && (it.mx || it.my);
 
-  function openPack() {
-    if (coins < 500) {
-      document.getElementById('packResult').innerText = "NOT ENOUGH COINS! WIN MATCHES TO EARN 500.";
-      return;
+  // ---- SPACE with the ball: Up/Down held = PASS, otherwise shoot (hold to charge) ----
+  if (has && it.shootP && p.z < 4 && !p.charging) {
+    if (Math.abs(it.my) > 0.5 && !it.noPass) doPass(m, p, it, !!it.lob);
+    else { p.charging = true; p.charge = 0; p.aimAng = it.aimSet !== undefined ? it.aimSet : 0; }
+  } else if (has && it.shootP && p.z >= 4) { p.charge = 0.7; fireShot(m, p, true); }
+  if (p.charging) {
+    if (!has) { p.charging = false; p.charge = 0; }
+    else {
+      if (it.shoot) {
+        p.charge += dt / 0.95;
+        if (it.aimSet === undefined) p.aimAng = clamp(p.aimAng + (it.aimDir || 0) * dt * 1.4, -0.65, 0.65);
+        p.fx = p.team === 0 ? 1 : -1; p.fy = 0;
+        if (p.charge >= 1.1) fireShot(m, p, false);
+      } else fireShot(m, p, false);
     }
-    updateCoins(-500);
-    var pool = PLAYER_POOL.slice(0, 10);
-    var pulled = pool.slice(Math.floor(Math.random() * pool.length)).shift();
-    var exists = false;
-    for (var i = 0; i < myPlayers.length; i++) {
-      if (myPlayers.at(i).id === pulled.id) exists = true;
+  } else if (!has && it.shootP) {
+    if (p.z > 4) {
+      // aerial: diving header / bicycle kick
+      const dist = Math.hypot(b.x - p.x, b.y - p.y);
+      if (!b.owner && dist < 38 && Math.abs(b.z - (p.z + 14)) < 44) {
+        const bike = b.z > p.z + 26, ang = goalAngle(p);
+        kickBall(m, p, Math.cos(ang), Math.sin(ang), (230 + st.shot * 2.2) * (bike ? 1.15 : 1), bike ? 0.1 : 0.06, 0, 0, bike);
+        if (bike) { p.spin = 0.4; popup(m, 'BICYCLE!', p.x, p.y); }
+      } else { p.vx += p.fx * 130; }
+    } else if (p.slideCd <= 0) { startSlide(m, p); return; }
+  }
+
+  // ---- AI-style explicit pass ----
+  if (has && it.passP && !p.charging) doPass(m, p, it, false);
+
+  // ---- jump ----
+  if (it.jumpP && p.z === 0 && !p.charging && p.kickAnim <= 0.1) p.vz = 200 + st.jump * 1.4;
+
+  // ---- movement ----
+  let sp = 120 + st.pace * 1.15;
+  if (has) sp *= 0.94; if (p.charging) sp *= 0.3; if (p.kickAnim > 0.14) sp *= 0.8;
+  if (canSprint) { sp *= 1.32; p.stamina -= dt * 0.45; if (p.stamina <= 0) { p.stamina = 0; p.exhausted = true; } }
+  else { p.stamina = Math.min(1, p.stamina + dt * 0.28); if (p.stamina > 0.3) p.exhausted = false; }
+  let mx = it.mx, my = it.my; const len = Math.hypot(mx, my);
+  if (len > 1) { mx /= len; my /= len; }
+  const acc = p.z > 0 ? 3 : 12;
+  p.vx += (mx * sp - p.vx) * Math.min(1, acc * dt); p.vy += (my * sp * 0.72 - p.vy) * Math.min(1, acc * dt);
+  if (len > 0.1 && !p.charging) { const fl = Math.hypot(mx, my * 0.8) || 1; p.fx = mx / fl; p.fy = my * 0.8 / fl; }
+  p.x = clamp(p.x + p.vx * dt, 6, PW - 6); p.y = clamp(p.y + p.vy * dt, 6, PD - 6);
+  if (p.z > 0 || p.vz > 0) { p.vz -= 900 * dt; p.z += p.vz * dt; if (p.z <= 0) { p.z = 0; p.vz = 0; } }
+  if (p.spin > 0) p.spin -= dt;
+  p.runPhase += Math.hypot(p.vx, p.vy) * dt * 0.09;
+}
+
+/* ---------- AI (formation-based) ---------- */
+function aiIntent(m, p, tm, dt) {
+  const b = m.ball, it = { mx: 0, my: 0, sprint: false, shoot: false, shootP: false, shootR: false, jumpP: false, passP: false, lobP: false, aimDir: 0, noPass: true };
+  const atk = p.team === 0 ? 1 : -1, goalX = p.team === 0 ? PW : 0, L = tm.lvl;
+  const opps = m.tm[1 - p.team].players, has = b.owner === p;
+  const teamHas = b.owner && b.owner.team === p.team, oppHas = b.owner && b.owner.team !== p.team;
+  p.aiT -= dt;
+  const moveTo = (tx, ty, spr) => { const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy); if (d > 6) { it.mx = dx / d; it.my = dy / d; } it.sprint = !!spr && d > 50; };
+  if (p.charging) { it.shoot = true; if (p.charge >= p.aiCharge) { it.shoot = false; it.shootR = true; } it.aimSet = p.aimAng; return it; }
+  const speedMul = 0.84 + 0.16 * L;
+
+  if (has) {
+    const dg = Math.abs(goalX - p.x), keeper = m.keepers[1 - p.team];
+    let no = null, nd = 1e9; for (const o of opps) { const d = Math.hypot(o.x - p.x, o.y - p.y); if (d < nd) { nd = d; no = o; } }
+    if ((dg < 300 && p.aiT <= 0 && Math.random() < dt * 2.2) || dg < 140) {
+      const ty = (keeper.y > GYC ? GYC - 26 : GYC + 26) + rnd(-12, 12) * (1.5 - L);
+      const ang = Math.atan2((ty - p.y) / DEPTH_K, goalX - p.x), a0 = goalAngle(p);
+      it.shootP = true; it.shoot = true; it.aimSet = clamp((ang - a0) * atk, -0.65, 0.65);
+      p.aiCharge = Math.random() < 0.3 * L ? rnd(0.79, 0.87) : rnd(0.6, 0.78); p.aiT = 0.8;
+      return it;
     }
-    if (!exists) myPlayers.push(pulled);
-    activePlayer = pulled;
-    document.getElementById('packResult').innerText = "WALKOUT! PACKED " + pulled.name + " (" + pulled.ovr + " OVR)!";
-    renderMyClub();
+    if (nd < 60 && p.aiT <= 0) {
+      const q = bestPassTarget(m, p, { x: atk, y: 0 });
+      if (q && Math.abs(goalX - q.x) < Math.abs(goalX - p.x) + 25) { const dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy) || 1; it.mx = dx / d; it.my = dy / d; it.passP = true; p.aiT = 0.7; return it; }
+    }
+    let ty = p.y + (GYC - p.y) * 0.4; if (no && nd < 90) ty += (p.y >= no.y ? 1 : -1) * 55;
+    moveTo(goalX - atk * 30, clamp(ty, 30, PD - 30), nd < 110);
+    it.mx *= speedMul; it.my *= speedMul; return it;
   }
-
-  function renderMyClub() {
-    var grid = document.getElementById('myClubGrid');
-    grid.innerHTML = '';
-    myPlayers.forEach(function(p) {
-      var div = document.createElement('div');
-      div.className = 'card' + (activePlayer.id === p.id ? ' selected' : '');
-      div.innerHTML = '<div class="ovr">' + p.ovr + '</div><div class="name">' + p.name + '</div><div class="club">' + p.club + '</div><div class="stats">SPD:' + Math.round(p.speed*16) + ' PWR:' + Math.round(p.power*70) + '</div>';
-      div.onclick = function() { activePlayer = p; renderMyClub(); };
-      grid.appendChild(div);
-    });
+  if (tm.chasers.includes(p) && !teamHas) {
+    moveTo(b.x + b.vx * 0.25, b.y + b.vy * 0.25, true);
+    const d = Math.hypot(p.x - b.x, p.y - b.y);
+    if (oppHas && d < 32 && p.slideCd <= 0 && Math.random() < dt * 3.5 * L) it.shootP = true;
+    if (!oppHas && b.z > 22 && b.z < 72 && d < 42 && p.z === 0 && p.aiT <= 0) { it.jumpP = true; p.aiT = 0.6; }
+    if (p.z > 5 && d < 36 && b.z > 14) it.shootP = true;
+    it.mx *= speedMul; it.my *= speedMul; return it;
   }
+  // shape: slide the whole formation with the ball, forwards push up when attacking
+  const shift = clamp((b.x - PW / 2) * 0.45, -160, 160);
+  let tx = p.home.x + shift, ty = p.home.y + (b.y - GYC) * 0.18;
+  if (teamHas) tx += atk * (p.idx >= 7 ? 90 : p.idx >= 4 ? 45 : 10);
+  else if (oppHas && p.idx <= 3) tx = p.home.x + shift * 0.5;
+  moveTo(clamp(tx, 30, PW - 30), clamp(ty, 25, PD - 25), false);
+  it.mx *= speedMul; it.my *= speedMul; return it;
+}
 
-  function renderRealClubs() {
-    var grid = document.getElementById('realClubsGrid');
-    grid.innerHTML = '';
-    PLAYER_POOL.slice(0, 10).forEach(function(p) {
-      var div = document.createElement('div');
+/* ---------- human control assignment ---------- */
+function updateHumans(m) {
+  for (const p of m.players) p.human = null;
+  const b = m.ball;
+  for (const h of m.humans) {
+    if (!h.ctl) continue;
+    pollCtl(h.ctl);
+    const tm = m.tm[h.team], taken = i => m.humans.some(o => o !== h && o.ctl && o.team === h.team && o.idx === i);
+    if (!h.locked) {
+      const cur = tm.players[h.idx];
+      if (b.owner && b.owner.team === h.team && !b.owner.isKeeper && !taken(b.owner.idx)) h.idx = b.owner.idx;
+      else if (h.ctl.edge.passP) {          // X: switch to the nearest teammate to the ball
+        let best = h.idx, bd = 1e9;
+        tm.players.forEach((q, i) => { const d = Math.hypot(q.x - b.x, q.y - b.y); if (i !== h.idx && !taken(i) && d < bd) { bd = d; best = i; } });
+        h.idx = best;
+      } else if (!cur.charging && cur.slideT <= 0 && !(b.owner && b.owner.team === h.team)) {
+        let best = h.idx, bd = Math.hypot(cur.x - b.x, cur.y - b.y) - 30;
+        tm.players.forEach((q, i) => { const d = Math.hypot(q.x - b.x, q.y - b.y); if (!taken(i) && d < bd) { bd = d; best = i; } });
+        h.idx = best;
+      }
+    }
+    tm.players[h.idx].human = h;
+  }
+  // the two nearest AI players of the team without the ball go for it
+  for (const tm of m.tm) {
+    const teamHas = b.owner && b.owner.team === tm.t;
+    const ai = tm.players.filter(p => !p.human).sort((a, c) => Math.hypot(a.x - b.x, (a.y - b.y) * 1.4) - Math.hypot(c.x - b.x, (c.y - b.y) * 1.4));
+    tm.chasers = teamHas ? [] : ai.slice(0, b.owner ? 2 : 1);
+  }
+}
+
+/* ---------- ball update, keepers, goals ---------- */
+function updateBall(m, dt) {
+  const b = m.ball;
+  if (b.owner) {
+    const o = b.owner;
+    if (o.isKeeper) { b.x = o.x + o.fx * 8; b.y = o.y; b.z = 18; b.vx = b.vy = b.vz = 0; }
+    else { b.x = o.x + o.fx * 11; b.y = o.y + o.fy * 5; b.z = o.z + 3; b.vx = o.vx; b.vy = o.vy; b.vz = 0; }
+    b.fire = false; b.turn = 0; b.turnT = 0;
+    if (!o.isKeeper) {   // opponents poking the ball away
+      for (const q of m.tm[1 - o.team].players) {
+        if (q.poke <= 0 && q.slideT <= 0 && q.z < 6 && Math.hypot(q.x - o.x, q.y - o.y) < 14) {
+          q.poke = 0.45;
+          const ch = clamp(0.16 + (q.st.def - o.st.pace) / 220, 0.08, 0.4) * (o.charging ? 1.5 : 1);
+          if (Math.random() < ch) { o.cd = 0.5; o.charging = false; o.charge = 0; b.owner = q; b.last = q; emit(m, 'tackle', { x: q.x, y: q.y }); break; }
+        }
+      }
+    }
+    return;
+  }
+  if (b.turnT > 0) {
+    b.turnT -= dt; const a = b.turn * dt, c = Math.cos(a), s = Math.sin(a), nx = b.vx * c - b.vy * s, ny = b.vx * s + b.vy * c; b.vx = nx; b.vy = ny;
+    if (b.turnT <= 0) b.turn = 0;
+  }
+  b.vz -= 520 * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
+  if (b.z <= 0) { b.z = 0; if (b.vz < -60) b.vz = -b.vz * 0.55; else b.vz = 0; }
+  const f = Math.pow(b.z <= 0.5 ? 0.42 : 0.85, dt); b.vx *= f; b.vy *= f;
+  if (b.y < 4) { b.y = 4; b.vy = Math.abs(b.vy) * 0.7; } if (b.y > PD - 4) { b.y = PD - 4; b.vy = -Math.abs(b.vy) * 0.7; }
+  b.spin += Math.hypot(b.vx, b.vy) * dt * 0.06;
+  if (b.x < 0 || b.x > PW) { endLine(m); if (m.state !== 'play') return; }
+  if (b.fire) { if (Math.hypot(b.vx, b.vy) < 170) b.fire = false; else if (Math.random() < 0.8) burst(m, b.x, b.y, b.z, 1, ['#ffb703', '#fb5607', '#ffe066'], 25, 0.35, 0); }
+  for (const p of m.players) {
+    if (p.cd > 0 || p.slideT > 0) continue;
+    if (Math.hypot(p.x - b.x, p.y - b.y) < 15 && b.z < 24 && Math.abs(b.z - p.z) < 22) { b.owner = p; b.last = p; p.charging = false; p.charge = 0; b.fire = false; break; }
+  }
+}
+function endLine(m) {
+  const b = m.ball, left = b.x < 0, inMouth = b.y > GY0 + 3 && b.y < GY1 - 3;
+  if (inMouth && b.z < CROSS) { scoreGoal(m, left ? 1 : 0); return; }
+  if (inMouth || (b.y > GY0 - 7 && b.y < GY1 + 7)) { if (Math.hypot(b.vx, b.vy) > 160) emit(m, 'post', { x: b.x < 0 ? 4 : PW - 4, y: b.y }); }
+  b.x = left ? 1 : PW - 1; b.vx = -b.vx * 0.55; b.vy *= 0.8; b.fire = false;
+}
+function scoreGoal(m, team) {
+  const b = m.ball;
+  m.score[team]++; m.state = 'goal'; m.stateT = 2.8; m.kickTeam = 1 - team;
+  m.netRip[team === 0 ? 1 : 0] = 1.3;
+  b.x = team === 0 ? PW + 6 : -6; b.vx = b.vy = b.vz = 0; b.z = 0; b.fire = false; b.owner = null;
+  emit(m, 'goal', { team, x: clamp(b.x, 10, PW - 10), y: b.y });
+}
+
+function updateKeeper(m, k, dt) {
+  const b = m.ball, t = k.team, gx = t === 0 ? 0 : PW, into = t === 0 ? 1 : -1, st = k.st;
+  k.saveCd = Math.max(0, k.saveCd - dt); k.dive = Math.max(0, k.dive - dt); k.kickAnim = Math.max(0, k.kickAnim - dt);
+  if (b.owner === k) {
+    k.hold -= dt;
+    if (k.hold <= 0) {
+      let tgt = null, bd = 1e9;
+      for (const q of m.tm[t].players) { const d = Math.abs(q.x - PW * 0.42) + Math.abs(q.y - k.y) * 0.3; if (d < bd) { bd = d; tgt = q; } }
+      const dx = tgt.x - k.x, dy = (tgt.y - k.y) / DEPTH_K, d = Math.hypot(dx, dy), speed = clamp(d * 0.9 + 140, 280, 460);
+      kickBall(m, k, dx, dy, speed, clamp(260 * d / (speed * speed), 0.15, 0.9), 0, 0, false);
+      k.saveCd = 0.6;
+    }
+    return;
+  }
+  const towards = !b.owner && (t === 0 ? b.vx < -40 : b.vx > 40);
+  let tx = gx + into * 12, ty = clamp(b.y, GY0 - 6, GY1 + 6) * 0.6 + GYC * 0.4;
+  if (towards) {
+    const tt = Math.abs((gx - b.x) / b.vx);
+    if (tt < 1.5) ty = clamp(b.y + b.vy * tt, GY0 - 3, GY1 + 3);
+  } else if (b.owner && b.owner.team !== t) {
+    const d = Math.abs(b.owner.x - gx);
+    if (d < 170) tx = gx + into * clamp((170 - d) * 0.22, 0, 30);
+    ty = clamp(b.owner.y * 0.7 + GYC * 0.3, GY0 - 8, GY1 + 8);
+  }
+  const sp = 105 + st.pace * 0.9 + (towards ? 90 : 0);
+  k.vx = clamp(tx - k.x, -sp * dt, sp * dt) / dt; k.vy = clamp(ty - k.y, -sp * dt, sp * dt) / dt;
+  k.x += k.vx * dt; k.y += k.vy * dt; k.runPhase += Math.hypot(k.vx, k.vy) * dt * 0.08;
+  if (!b.owner && k.saveCd <= 0) {
+    const reach = 17 + st.def * 0.14, v = Math.hypot(b.vx, b.vy);
+    if (Math.hypot(b.x - k.x, b.y - k.y) < reach && b.z < 30 + st.jump * 0.55 && (towards || (v < 130 && Math.abs(b.x - gx) < 70))) {
+      k.saveCd = 0.3; k.dive = 0.45;
+      const diff = v / (380 + st.def * 2.6), chance = clamp(0.95 - diff * 0.62, 0.22, 0.95);
+      if (Math.random() < chance) {
+        if (v < 330) { b.owner = k; k.hold = 0.9; b.last = k; emit(m, 'save', { x: k.x, y: k.y }); }
+        else { b.vx = -b.vx * 0.35 + into * 90; b.vy = (b.y >= k.y ? 1 : -1) * rnd(80, 190); b.vz = rnd(60, 150); b.last = k; b.fire = false; b.turn = 0; b.turnT = 0; emit(m, 'save', { x: k.x, y: k.y }); }
+      }
+    }
+  }
+}
+
+/* ---------- main step ---------- */
+function startHalfTime(m) { m.state = 'half'; m.stateT = 2.8; emit(m, 'whistle'); emit(m, 'banner', { t: 'HALF TIME', ms: 2400 }); }
+function beginEnd(m, pens) { m.state = 'end'; m.stateT = 2.4; m.pens = !!pens; emit(m, 'end'); emit(m, 'banner', { t: pens ? 'FULL TIME - PENALTIES!' : 'FULL TIME', ms: 2300 }); }
+function teamStrength(m, t) { return m.tm[t].players.reduce((a, p) => a + p.pd.ovr, 0) / m.tm[t].players.length; }
+
+function stepMatch(m, dt) {
+  m.clock += dt;
+  if (m.hitstop > 0) { m.hitstop -= dt; return; }
+  m.shake = Math.max(0, m.shake - dt * 14);
+  for (let i = 0; i < 2; i++) m.netRip[i] = Math.max(0, m.netRip[i] - dt);
+  updateParts(m, dt);
+  if (m.state === 'kickoff') { m.stateT -= dt; if (m.stateT <= 0) { m.state = 'play'; emit(m, 'whistle'); } return; }
+  if (m.state === 'goal') {
+    m.stateT -= dt;
+    if (m.stateT <= 0) { if (m.golden) beginEnd(m, false); else resetKickoff(m, m.kickTeam); }
+    return;
+  }
+  if (m.state === 'half') { m.stateT -= dt; if (m.stateT <= 0) { m.half = 2; m.time = m.cfg.halfLen || 120; resetKickoff(m, 1); } return; }
+  if (m.state === 'end') { m.stateT -= dt; if (m.stateT <= 0) m.ended = true; return; }
+
+  // ---- play ----
+  if (!m.golden) {
+    m.time -= dt;
+    if (m.time <= 0) {
+      m.time = 0;
+      if (m.half === 1) { startHalfTime(m); return; }
+      if (m.score[0] === m.score[1] && m.cfg.golden) { m.golden = true; m.goldT = 0; emit(m, 'banner', { t: 'GOLDEN GOAL!', ms: 2200 }); }
+      else { beginEnd(m, false); return; }
+    }
+  } else {
+    m.goldT += dt;
+    if (m.goldT > 75) {
+      const s0 = teamStrength(m, 0), s1 = teamStrength(m, 1);
+      m.penWinner = Math.random() < 0.5 + (s0 - s1) / 60 ? 0 : 1; beginEnd(m, true); return;
+    }
+  }
+  updateHumans(m);
+  for (const tm of m.tm) {
+    for (const p of tm.players) {
+      let it;
+      if (p.human) {
+        const h = p.human.ctl.held, e = p.human.ctl.edge;
+        it = { mx: h.mx, my: h.my, sprint: h.sprint, shoot: h.shoot, shootP: e.shootP, shootR: e.shootR, jumpP: e.jumpP, passP: false, lobP: false, lob: h.jump, aimDir: h.my };
+      } else it = aiIntent(m, p, tm, dt);
+      applyIntent(m, p, it, dt);
+    }
+  }
+  // soft player separation
+  for (let i = 0; i < m.players.length; i++) for (let j = i + 1; j < m.players.length; j++) {
+    const a = m.players[i], c = m.players[j]; if (a.z > 8 || c.z > 8 || a.slideT > 0 || c.slideT > 0) continue;
+    const dx = c.x - a.x, dy = c.y - a.y, d = Math.hypot(dx, dy);
+    if (d > 0.01 && d < 13) { const push = (13 - d) * 0.5; a.x -= dx / d * push; a.y -= dy / d * push; c.x += dx / d * push; c.y += dy / d * push; }
+  }
+  updateBall(m, dt);
+  if (m.state !== 'play') return;
+  for (const k of m.keepers) updateKeeper(m, k, dt);
+  for (const q of m.popups) q.t -= dt;
+  m.popups = m.popups.filter(q => q.t > 0);
+}
+
+function updateParts(m, dt) {
+  for (const q of m.parts) { q.life -= dt; q.vz -= q.g * dt; q.x += q.vx * dt; q.y += q.vy * dt; q.z += q.vz * dt; if (q.z < 0) { q.z = 0; q.vz *= -0.3; q.vx *= 0.6; } }
+  m.parts = m.parts.filter(q => q.life > 0);
+  if (m.parts.length > 400) m.parts.splice(0, m.parts.length - 400);
+}
+
+function matchResult(m) {
+  let winner = m.score[0] > m.score[1] ? 0 : m.score[1] > m.score[0] ? 1 : -1;
+  if (m.pens && m.penWinner !== undefined) winner = m.penWinner;
+  return { h: m.score[0], a: m.score[1], winner, pens: m.pens };
+}
+
+/* ============================== NETCODE SNAPSHOTS ====================== */
+const r1 = v => Math.round(v * 10) / 10;
+function makeSnap(m) {
+  const b = m.ball; let ow = -1;
+  if (b.owner) ow = b.owner.isKeeper ? -2 - b.owner.team : m.players.indexOf(b.owner);
+  const ev = m.out; m.out = [];
+  return {
+    t: 's', time: r1(m.time), half: m.half, score: m.score, state: m.state, golden: m.golden, gt: r1(m.goldT), hum: m.humans.map(h => h.idx), rip: m.netRip.map(r1),
+    b: [r1(b.x), r1(b.y), r1(b.z), b.fire ? 1 : 0, r1(b.spin), ow],
+    p: m.players.map(p => [r1(p.x), r1(p.y), r1(p.z), r1(p.fx), r1(p.fy), r1(p.charge), r1(p.stamina), r1(p.slideT), r1(p.runPhase), r1(p.aimAng), p.charging ? 1 : 0, r1(p.kickAnim), r1(p.vx), r1(p.vy)]),
+    k: m.keepers.map(k => [r1(k.x), r1(k.y), r1(k.dive), r1(k.vx), r1(k.vy)]),
+    ev,
+  };
+}
+function applySnap(m, s) {
+  m.time = s.time; m.half = s.half; m.score = s.score; m.state = s.state; m.golden = s.golden; m.goldT = s.gt; m.netRip = s.rip;
+  s.hum.forEach((v, i) => { if (m.humans[i]) m.humans[i].idx = v; });
+  const b = m.ball; b.tx = s.b[0]; b.ty = s.b[1]; b.tz = s.b[2]; b.fire = !!s.b[3]; b.spin = s.b[4];
+  b.owner = s.b[5] >= 0 ? m.players[s.b[5]] : (s.b[5] <= -2 ? m.keepers[-2 - s.b[5]] : null);
+  if (!m.snapSeen) { b.x = b.tx; b.y = b.ty; b.z = b.tz; }
+  s.p.forEach((a, i) => { const p = m.players[i]; p.tx = a[0]; p.ty = a[1]; if (!m.snapSeen) { p.x = a[0]; p.y = a[1]; } p.z = a[2]; p.fx = a[3]; p.fy = a[4]; p.charge = a[5]; p.stamina = a[6]; p.slideT = a[7]; p.runPhase = a[8]; p.aimAng = a[9]; p.charging = !!a[10]; p.kickAnim = a[11]; p.vx = a[12]; p.vy = a[13]; });
+  s.k.forEach((a, i) => { const k = m.keepers[i]; k.tx = a[0]; k.ty = a[1]; if (!m.snapSeen) { k.x = a[0]; k.y = a[1]; } k.dive = a[2]; k.vx = a[3]; k.vy = a[4]; });
+  m.snapSeen = true;
+  for (const e of s.ev) handleEvent(m, e[0], e[1]);
+}
+function guestSmooth(m, dt) {
+  const f = Math.min(1, 22 * dt), ents = m.players.concat(m.keepers, [m.ball]);
+  for (const e of ents) { if (e.tx !== undefined) { e.x += (e.tx - e.x) * f; e.y += (e.ty - e.y) * f; } }
+  m.ball.z += (m.ball.tz - m.ball.z) * f; m.clock += dt;
+  updateParts(m, dt); m.popups.forEach(q => q.t -= dt); m.popups = m.popups.filter(q => q.t > 0);
+  m.shake = Math.max(0, m.shake - dt * 14);
+}
+
+/* ============================== RENDERING ============================== */
+let BG = null;
+function buildBG() {
+  BG = document.createElement('canvas'); BG.width = W; BG.height = H; const g = BG.getContext('2d');
+  let gr = g.createLinearGradient(0, 0, 0, 212); gr.addColorStop(0, '#141a3a'); gr.addColorStop(1, '#2b3566'); g.fillStyle = gr; g.fillRect(0, 0, W, 212);
+  const cols = ['#e63946', '#f1c453', '#4cc9f0', '#f8f9fa', '#8ac926', '#ff9f1c', '#b388eb'];
+  let seed = 7; const r = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let row = 0; row < 8; row++) for (let i = 0; i < 82; i++) {
+    g.fillStyle = cols[Math.floor(r() * cols.length)]; g.globalAlpha = 0.5 + r() * 0.4;
+    const x = i * 12 + (row % 2) * 6 + r() * 3, y = 18 + row * 20 + r() * 3;
+    g.beginPath(); g.arc(x, y + 6, 4.5, 0, 7); g.fill(); g.fillRect(x - 4, y + 10, 8, 7);
+  }
+  g.globalAlpha = 1;
+  const ads = ['FC BROS', 'SOCCER BROS', 'ULTIMATE TEAM', 'HYPER-LINK', 'ICON PACKS', 'ROAD TO GLORY'];
+  g.font = 'bold 12px Trebuchet MS'; g.textAlign = 'center';
+  for (let i = 0; i < 6; i++) { g.fillStyle = i % 2 ? '#d62828' : '#003049'; g.fillRect(i * 160, 190, 160, 22); g.fillStyle = '#fff'; g.fillText(ads[i], i * 160 + 80, 205); }
+  g.fillStyle = '#1b6a2e'; g.fillRect(0, 212, W, H - 212);
+  const poly = (pts, col) => { g.fillStyle = col; g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); g.closePath(); g.fill(); };
+  for (let i = 0; i < 14; i++) {
+    const x0 = -40 + (PW + 80) * i / 14, x1 = -40 + (PW + 80) * (i + 1) / 14;
+    poly([proj(x0, -12, 0), proj(x1, -12, 0), proj(x1, PD + 14, 0), proj(x0, PD + 14, 0)], i % 2 ? '#2e9644' : '#36a44c');
+  }
+  g.strokeStyle = 'rgba(255,255,255,0.9)'; g.lineWidth = 2;
+  const line = (pts, close) => { g.beginPath(); pts.forEach((p, i) => { const q = proj(p[0], p[1], 0); i ? g.lineTo(q.x, q.y) : g.moveTo(q.x, q.y); }); if (close) g.closePath(); g.stroke(); };
+  line([[0, 0], [PW, 0], [PW, PD], [0, PD]], true);
+  line([[PW / 2, 0], [PW / 2, PD]]);
+  const circ = []; for (let a = 0; a < 6.3; a += 0.2) circ.push([PW / 2 + 55 * Math.cos(a), PD / 2 + 42 * Math.sin(a)]); line(circ, true);
+  line([[0, 55], [115, 55], [115, 245], [0, 245]]); line([[PW, 55], [PW - 115, 55], [PW - 115, 245], [PW, 245]]);
+  line([[0, 95], [44, 95], [44, 205], [0, 205]]); line([[PW, 95], [PW - 44, 95], [PW - 44, 205], [PW, 205]]);
+  const cs = proj(PW / 2, PD / 2, 0); g.fillStyle = '#fff'; g.beginPath(); g.ellipse(cs.x, cs.y, 3, 2, 0, 0, 7); g.fill();
+}
+
+function drawGoal(m, side) {
+  const sgn = side === 0 ? -1 : 1, gx = side === 0 ? 0 : PW, depth = 24, rip = m ? m.netRip[side] : 0;
+  const P = (x, y, z) => proj(x, y, z);
+  const wob = k => rip > 0 ? Math.sin(m.clock * 40 + k) * rip * 4 : 0;
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,255,255,0.10)'; ctx.beginPath();
+  const a = P(gx, GY0, 0), b = P(gx + sgn * depth, GY0, CROSS - 6), c = P(gx + sgn * depth, GY1, CROSS - 6), d = P(gx, GY1, 0);
+  ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1;
+  for (let y = GY0; y <= GY1; y += 8) { const q0 = P(gx, y, CROSS), q1 = P(gx + sgn * depth, y, CROSS - 6), q2 = P(gx + sgn * depth, y, 0); ctx.beginPath(); ctx.moveTo(q0.x, q0.y); ctx.lineTo(q1.x + wob(y), q1.y); ctx.lineTo(q2.x + wob(y), q2.y); ctx.stroke(); }
+  for (let z = 0; z <= CROSS; z += 10) { const q0 = P(gx + sgn * depth, GY0, Math.max(0, z - 6)), q1 = P(gx + sgn * depth, GY1, Math.max(0, z - 6)); ctx.beginPath(); ctx.moveTo(q0.x + wob(z), q0.y); ctx.lineTo(q1.x + wob(z + 3), q1.y); ctx.stroke(); }
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 3.2;
+  const t0 = P(gx, GY0, 0), t1 = P(gx, GY0, CROSS), t2 = P(gx, GY1, CROSS), t3 = P(gx, GY1, 0);
+  ctx.beginPath(); ctx.moveTo(t0.x, t0.y); ctx.lineTo(t1.x, t1.y); ctx.lineTo(t2.x, t2.y); ctx.lineTo(t3.x, t3.y); ctx.stroke();
+  const bt1 = P(gx + sgn * depth, GY0, CROSS - 6), bt2 = P(gx + sgn * depth, GY1, CROSS - 6);
+  ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(t1.x, t1.y); ctx.lineTo(bt1.x, bt1.y); ctx.moveTo(t2.x, t2.y); ctx.lineTo(bt2.x, bt2.y); ctx.moveTo(bt1.x, bt1.y); ctx.lineTo(bt2.x, bt2.y); ctx.stroke();
+  ctx.restore();
+}
+
+function drawHair(e, headY) {
+  const hs = e.pd.hairStyle, hc = e.pd.hairColor; ctx.fillStyle = hc; ctx.strokeStyle = hc;
+  const cap = r => { ctx.beginPath(); ctx.arc(0, headY - 1, r, Math.PI * 1.04, Math.PI * 1.96); ctx.closePath(); ctx.fill(); };
+  switch (hs) {
+    case 'short': cap(11.6); ctx.fillRect(-11, headY - 4, 3, 6); break;
+    case 'buzz': ctx.globalAlpha = 0.65; cap(11.2); ctx.globalAlpha = 1; break;
+    case 'curly': for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.arc(i * 4.6, headY - 9 + Math.abs(i) * 1.6, 4.4, 0, 7); ctx.fill(); } break;
+    case 'long': cap(11.8); ctx.fillRect(-12, headY - 6, 5, 18); ctx.fillRect(7.5, headY - 5, 3, 8); break;
+    case 'afro': ctx.beginPath(); ctx.arc(0, headY - 3, 14.5, 0, 7); ctx.fill(); break;
+    case 'slick': cap(11.5); ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(-6, headY - 11, 10, 2); break;
+    case 'mohawk': ctx.beginPath(); ctx.moveTo(-8, headY - 8); ctx.lineTo(-4, headY - 18); ctx.lineTo(0, headY - 10); ctx.lineTo(4, headY - 18); ctx.lineTo(8, headY - 8); ctx.closePath(); ctx.fill(); break;
+    default: break;
+  }
+}
+
+function drawChibi(m, e, mark) {
+  const P = proj(e.x, e.y, 0), sc = P.sc, k = sc * SPR, zz = e.z * sc, dir = e.fx >= 0 ? 1 : -1;
+  ctx.fillStyle = 'rgba(0,0,0,0.33)'; ctx.beginPath(); ctx.ellipse(P.x, P.y, (13 - Math.min(e.z, 50) * 0.1) * k, 4.6 * k, 0, 0, 7); ctx.fill();
+  const kit = e.kit, moving = Math.hypot(e.vx || 0, e.vy || 0) > 18, run = moving ? Math.sin(e.runPhase) : 0;
+  ctx.save(); ctx.translate(P.x, P.y - zz); ctx.scale(k, k);
+  if (e.slideT > 0) { ctx.rotate(dir * 1.2); ctx.translate(0, 6); }
+  else if (e.spin > 0) { ctx.translate(0, -16); ctx.rotate(dir * (1 - e.spin / 0.4) * 6.28); ctx.translate(0, 16); }
+  ctx.scale(dir, 1);
+  if (e.isKeeper && e.dive > 0) ctx.rotate(0.54 * (e.y > GYC ? 1 : -1));
+  let l = run * 5; if (e.kickAnim > 0.05) l = 8;
+  ctx.fillStyle = e.pd.skinTone; ctx.fillRect(-6 - l * 0.4, -10, 4.4, 10); ctx.fillRect(1.6 + l, -10, 4.4, 10);
+  ctx.fillStyle = e.isKeeper ? '#222' : kit.c1; ctx.fillRect(-6 - l * 0.4, -6, 4.4, 4); ctx.fillRect(1.6 + l, -6, 4.4, 4);
+  ctx.fillStyle = '#111'; ctx.fillRect(-7 - l * 0.4, -2, 6.4, 2.6); ctx.fillRect(1.6 + l, -2, 7, 2.6);
+  ctx.fillStyle = kit.sh; ctx.fillRect(-7.5, -15.5, 15, 6.5);
+  const sw = run * 4;
+  ctx.fillStyle = e.pd.skinTone; ctx.fillRect(-11.2, -27 + sw * 0.3, 3.4, 9); ctx.fillRect(7.8, -27 - sw * 0.3, 3.4, 9);
+  ctx.fillStyle = e.isKeeper ? '#fff' : kit.c1; ctx.fillRect(-11.2, -27 + sw * 0.3, 3.4, 4); ctx.fillRect(7.8, -27 - sw * 0.3, 3.4, 4);
+  ctx.fillStyle = kit.c1; ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(-8.5, -29, 17, 14.5, 3); else ctx.rect(-8.5, -29, 17, 14.5); ctx.fill();
+  ctx.save(); ctx.beginPath(); ctx.rect(-8.5, -29, 17, 14.5); ctx.clip(); ctx.fillStyle = kit.c2;
+  if (kit.style === 'stripes') { for (let i = -2; i <= 2; i += 2) ctx.fillRect(i * 3.4 - 1.7, -29, 3.4, 15); }
+  else if (kit.style === 'hoops') { for (let i = 0; i < 4; i += 2) ctx.fillRect(-9, -29 + i * 3.6, 18, 3.6); }
+  else if (kit.style === 'sash') { ctx.beginPath(); ctx.moveTo(-9, -29); ctx.lineTo(-3, -29); ctx.lineTo(9, -14); ctx.lineTo(3, -14); ctx.closePath(); ctx.fill(); }
+  else if (kit.style === 'checks') { for (let i = 0; i < 5; i++) for (let j = 0; j < 4; j++) if ((i + j) % 2 === 0) ctx.fillRect(-8.5 + i * 3.4, -29 + j * 3.6, 3.4, 3.6); }
+  ctx.restore();
+  ctx.save(); ctx.scale(dir, 1); ctx.fillStyle = (kit.style === 'solid' || kit.style === 'sash') ? (colorDist(kit.c1, '#ffffff') < 140 ? '#222' : '#fff') : '#111'; ctx.font = 'bold 8px Trebuchet MS'; ctx.textAlign = 'center'; ctx.fillText(e.num, 0, -18.5); ctx.restore();
+  const hy = -39;
+  if (e.pd.hairStyle === 'afro') drawHair(e, hy);
+  ctx.fillStyle = e.pd.skinTone; ctx.beginPath(); ctx.arc(0, hy, 11, 0, 7); ctx.fill();
+  if (e.pd.hairStyle !== 'afro') drawHair(e, hy);
+  if (e.beard) { ctx.strokeStyle = e.pd.hairColor; ctx.lineWidth = 3.4; ctx.beginPath(); ctx.arc(0, hy, 8.8, 0.22 * Math.PI, 0.82 * Math.PI); ctx.stroke(); }
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(3.3, hy - 1, 2.6, 3, 0, 0, 7); ctx.ellipse(8, hy - 1, 2.4, 3, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(4.2, hy - 0.5, 1.4, 0, 7); ctx.arc(8.6, hy - 0.5, 1.3, 0, 7); ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(6.5, hy + 4, 2.2, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+  if (e.isKeeper) { ctx.fillStyle = '#ffeb3b'; ctx.beginPath(); ctx.arc(-9.6, -19, 3.4, 0, 7); ctx.arc(9.6, -19, 3.4, 0, 7); ctx.fill(); }
+  ctx.restore();
+  if (mark) {
+    const bob = Math.sin(m.clock * 8) * 2;
+    ctx.save(); ctx.translate(P.x, P.y - zz - 62 * k + bob); ctx.fillStyle = mark.c; ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(6, 0); ctx.lineTo(0, 9); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 10px Trebuchet MS'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeText(mark.l, 0, -3); ctx.fillText(mark.l, 0, -3); ctx.restore();
+    if (e.stamina < 0.98 && !e.isKeeper) {
+      ctx.strokeStyle = e.exhausted ? '#ef476f' : '#4cc9f0'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(P.x, P.y, 16 * k, 6 * k, 0, 0, Math.PI * 2 * e.stamina); ctx.stroke();
+    }
+  }
+}
+
+function drawBall(m) {
+  const b = m.ball, P = proj(b.x, b.y, b.z), G = proj(b.x, b.y, 0), k = P.sc, r = 5.6 * k;
+  ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(G.x, G.y, Math.max(2.5, r * (1 - Math.min(b.z, 80) / 220)), r * 0.42, 0, 0, 7); ctx.fill();
+  if (b.fire) { ctx.fillStyle = 'rgba(255,140,0,0.45)'; ctx.beginPath(); ctx.arc(P.x, P.y, r * 2, 0, 7); ctx.fill(); }
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(P.x, P.y, r, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#222'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.fillStyle = '#222';
+  for (let i = 0; i < 3; i++) { const a = b.spin + i * 2.09; ctx.beginPath(); ctx.arc(P.x + Math.cos(a) * r * 0.5, P.y + Math.sin(a) * r * 0.5, r * 0.28, 0, 7); ctx.fill(); }
+}
+
+function predictPath(p) {
+  const atk = p.team === 0 ? 1 : -1, ang = goalAngle(p) + p.aimAng * atk, st = p.st;
+  const speed = (200 + st.shot * 3.0) * powerFactor(0.83);
+  const turn = -Math.sign(p.aimAng) * Math.min(Math.abs(p.aimAng), 0.5) * (st.shot / 99) * 1.2;
+  let x = p.x + Math.cos(ang) * 11, y = p.y, z = 3, vx = Math.cos(ang) * speed, vy = Math.sin(ang) * speed * DEPTH_K, vz = speed * 0.16; const pts = [];
+  for (let i = 0; i < 15; i++) {
+    for (let s = 0; s < 4; s++) { const dt = 0.0175, a = i * 0.07 < 0.9 ? turn * dt : 0, c = Math.cos(a), sn = Math.sin(a), nx = vx * c - vy * sn, ny = vx * sn + vy * c; vx = nx; vy = ny; vz -= 520 * dt; x += vx * dt; y += vy * dt; z = Math.max(0, z + vz * dt); if (z === 0 && vz < 0) vz = -vz * 0.55; }
+    pts.push([x, y, z]);
+  }
+  return pts;
+}
+
+function drawShotUI(m, p) {
+  const pts = predictPath(p);
+  pts.forEach((q, i) => { const s = proj(clamp(q[0], -20, PW + 20), clamp(q[1], 0, PD), q[2]); ctx.fillStyle = `rgba(${255 - i * 10},${240 - i * 4},255,${0.85 - i * 0.05})`; ctx.beginPath(); ctx.arc(s.x, s.y, Math.max(1.2, 3 - i * 0.12), 0, 7); ctx.fill(); });
+  const P = proj(p.x, p.y, 0), R = 25 * P.sc, c0 = Math.PI * 0.12, span = Math.PI * 0.76, cx = P.x, cy = P.y - 2;
+  const seg = [[0, 0.55, '#35e08a'], [0.55, 0.78, '#ffd23f'], [0.78, 0.88, '#ffb703'], [0.88, 1, '#ef476f']];
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.ellipse(cx, cy, R, R * 0.5, 0, c0 - 0.04, c0 + span + 0.04); ctx.stroke();
+  const prog = clamp(p.charge, 0, 1);
+  for (const s of seg) {
+    ctx.lineWidth = 4.5; ctx.globalAlpha = 0.28; ctx.strokeStyle = s[2]; ctx.beginPath(); ctx.ellipse(cx, cy, R, R * 0.5, 0, c0 + span * s[0], c0 + span * s[1]); ctx.stroke();
+    if (prog > s[0]) { ctx.globalAlpha = 1; ctx.beginPath(); ctx.ellipse(cx, cy, R, R * 0.5, 0, c0 + span * s[0], c0 + span * Math.min(prog, s[1])); ctx.stroke(); }
+  }
+  ctx.globalAlpha = 1;
+  const ma = c0 + span * prog, mx = cx + Math.cos(ma) * R, my = cy + Math.sin(ma) * R * 0.5;
+  ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(mx, my, 3.4, 0, 7); ctx.fill(); ctx.stroke();
+  if (p.charge >= 0.78 && p.charge <= 0.88) { ctx.fillStyle = '#ffb703'; ctx.font = 'bold 11px Trebuchet MS'; ctx.textAlign = 'center'; ctx.fillText('SWEET!', cx, cy + R * 0.5 + 14); }
+  ctx.lineCap = 'butt';
+}
+
+function render(m) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, W, H);
+  if (!m) { drawMenuScene(); return; }
+  if (!BG) buildBG();
+  ctx.save();
+  if (m.shake > 0.2) ctx.translate(rnd(-m.shake, m.shake), rnd(-m.shake, m.shake));
+  ctx.drawImage(BG, 0, 0);
+  drawGoal(m, 0); drawGoal(m, 1);
+  const ents = m.players.concat(m.keepers, [m.ball]).sort((a, b) => a.y - b.y);
+  const marks = m.humans.map(h => ({ p: m.tm[h.team].players[h.idx], c: h.color, l: h.label }));
+  for (const e of ents) {
+    if (e === m.ball) { drawBall(m); continue; }
+    const mk = marks.find(q => q.p === e);
+    drawChibi(m, e, mk || null);
+  }
+  for (const mk of marks) if (mk.p && mk.p.charging) drawShotUI(m, mk.p);
+  for (const q of m.parts) { const P = proj(q.x, q.y, q.z); ctx.globalAlpha = clamp(q.life / q.max, 0, 1); ctx.fillStyle = q.c; ctx.fillRect(P.x, P.y, q.s, q.s); }
+  ctx.globalAlpha = 1; ctx.textAlign = 'center';
+  for (const q of m.popups) { const P = proj(clamp(q.x, 30, PW - 30), q.y, 40 + (1.2 - q.t) * 40); ctx.globalAlpha = clamp(q.t * 2, 0, 1); ctx.font = 'bold 20px Trebuchet MS'; ctx.lineWidth = 4; ctx.strokeStyle = '#000'; ctx.strokeText(q.text, P.x, P.y); ctx.fillStyle = '#ffd23f'; ctx.fillText(q.text, P.x, P.y); }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+/* ---------- HUD ---------- */
+let hudCache = '';
+function updateHud(m) {
+  const n0 = TEAMS[m.cfg.sides[0].team] ? TEAMS[m.cfg.sides[0].team].name : 'HOME', n1 = TEAMS[m.cfg.sides[1].team] ? TEAMS[m.cfg.sides[1].team].name : 'AWAY';
+  const tm = m.golden ? 'GOLDEN GOAL' : (Math.floor(m.time / 60) + ':' + String(Math.floor(m.time % 60)).padStart(2, '0') + (m.half === 1 ? ' 1H' : ' 2H'));
+  const key = n0 + n1 + m.score + tm; if (key === hudCache) return; hudCache = key;
+  $('#hudHome').textContent = (m.cfg.labels ? m.cfg.labels[0] : n0).toUpperCase(); $('#hudAway').textContent = (m.cfg.labels ? m.cfg.labels[1] : n1).toUpperCase();
+  $('#hudScore').textContent = m.score[0] + ' - ' + m.score[1]; $('#hudTime').textContent = tm;
+}
+
+/* ============================== MATCH RUNNER =========================== */
+let cur = null, rafId = 0, lastT = 0, acc = 0, paused = false, guestSend = 0, guestEv = {};
+
+function startMatch(cfg) {
+  Snd.init(); cur = createMatch(cfg); paused = false; acc = 0; lastT = performance.now(); hudCache = ''; guestEv = {}; guestSend = 0;
+  uiEl.innerHTML = ''; $('#hud').classList.remove('hidden'); $('#banner').classList.remove('show');
+  if (!rafId) rafId = requestAnimationFrame(frame);
+}
+function stopMatch() { cur = null; $('#hud').classList.add('hidden'); $('#banner').classList.remove('show'); }
+
+function frame(t) {
+  rafId = requestAnimationFrame(frame);
+  const dt = Math.min(0.1, (t - lastT) / 1000); lastT = t;
+  const m = cur;
+  if (m && !paused) {
+    if (m.net && m.net.role === 'guest') {
+      guestSmooth(m, dt);
+      const ctl = m.guestCtl, h = pollCtl(ctl), e = ctl.edge;
+      if (e.shootP) guestEv.sp = 1; if (e.shootR) guestEv.sr = 1; if (e.jumpP) guestEv.jp = 1; if (e.passP) guestEv.pp = 1;
+      guestSend += dt;
+      if (guestSend > 1 / 30) { guestSend = 0; Net.send({ t: 'in', h, ev: guestEv }); guestEv = {}; }
+    } else {
+      acc += dt;
+      while (acc >= STEP) { stepMatch(m, STEP); acc -= STEP; }
+      if (m.net && m.net.role === 'host') { m.snapN++; if (m.snapN % 3 === 0) Net.broadcast(makeSnap(m)); }
+    }
+    updateHud(m);
+    if (m.ended && !(m.net && m.net.role === 'guest')) {
+      const res = matchResult(m), cfg = m.cfg;
+      if (m.net) Net.broadcast({ t: 'end', res });
+      stopMatch(); if (cfg.onEnd) cfg.onEnd(res);
+    }
+  }
+  render(cur);
+}
+
+function togglePause() {
+  if (!cur) return; paused = !paused;
+  if (paused) go(`<h2>Paused</h2><div class="menu"><button class="btn big" data-act="resume">Resume</button><button class="btn big dim" data-act="quit">Quit Match</button></div>`, { resume: togglePause, quit: () => { const c = cur.cfg; paused = false; stopMatch(); (c.onQuit || showMain)(); } });
+  else uiEl.innerHTML = '';
+}
+
+/* ==========================================================================
+   PART 2 - MENUS, PIXEL SCENE & GAME MODES
+   ========================================================================== */
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const COLORS = ['#ffd23f', '#4cc9f0', '#ef476f', '#06d6a0', '#b388eb', '#ff9f1c', '#8ac926', '#f72585'];
+
+/* ---------------- pixel-art background (240x135, upscaled 4x, no smoothing) ---------------- */
+const PXC = document.createElement('canvas'); PXC.width = 240; PXC.height = 135; const pg = PXC.getContext('2d');
+let PXBG = null, sceneMode = 'loading';
+
+function buildPixelBG() {
+  PXBG = document.createElement('canvas'); PXBG.width = 240; PXBG.height = 135; const g = PXBG.getContext('2d');
+  g.fillStyle = '#0a0f2c'; g.fillRect(0, 0, 240, 135);
+  g.fillStyle = '#151d4a'; g.fillRect(0, 0, 240, 30);
+  // floodlights
+  [[22, 8], [218, 8], [120, 4]].forEach(([x, y]) => { g.fillStyle = '#fff6c2'; for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) g.fillRect(x - 5 + i * 4, y + j * 3, 3, 2); g.fillStyle = 'rgba(255,246,194,0.10)'; g.fillRect(x - 12, y + 7, 24, 22); });
+  // crowd
+  let seed = 11; const r = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const cols = ['#e63946', '#f1c453', '#4cc9f0', '#f8f9fa', '#8ac926', '#ff9f1c', '#b388eb'];
+  for (let row = 0; row < 9; row++) for (let i = 0; i < 60; i++) { g.fillStyle = cols[Math.floor(r() * cols.length)]; g.globalAlpha = 0.55 + r() * 0.4; g.fillRect(i * 4 + (row % 2) * 2, 20 + row * 4, 3, 3); }
+  g.globalAlpha = 1;
+  g.fillStyle = 'rgba(8,12,40,0.45)'; g.fillRect(0, 20, 240, 36);
+  // ad boards
+  for (let i = 0; i < 12; i++) { g.fillStyle = i % 2 ? '#d62828' : '#f1f1f1'; g.fillRect(i * 20, 57, 20, 5); g.fillStyle = i % 2 ? '#fff' : '#d62828'; g.fillRect(i * 20 + 4, 59, 12, 1); }
+  // grass
+  for (let i = 0; i < 12; i++) { g.fillStyle = i % 2 ? '#2f8f3f' : '#3aa24b'; g.fillRect(i * 20, 62, 20, 73); }
+  g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(0, 126, 240, 9);
+  // pitch lines
+  g.fillStyle = '#e8f5e9';
+  g.fillRect(10, 72, 220, 1); g.fillRect(10, 72, 1, 54); g.fillRect(229, 72, 1, 54); g.fillRect(10, 125, 220, 1); g.fillRect(119, 72, 1, 54);
+  for (let a = 0; a < 6.3; a += 0.05) g.fillRect(Math.round(120 + Math.cos(a) * 24), Math.round(99 + Math.sin(a) * 11), 1, 1);
+  g.fillRect(10, 84, 22, 1); g.fillRect(31, 84, 1, 30); g.fillRect(10, 113, 22, 1);
+  g.fillRect(208, 84, 22, 1); g.fillRect(208, 84, 1, 30); g.fillRect(208, 113, 22, 1);
+}
+
+function drawPixelGuy(g, x, y, t) {
+  const phase = (t * 1.2) % 1, ballH = Math.abs(Math.sin(phase * Math.PI)) * 30;
+  const lift = (phase < 0.1 || phase > 0.9) ? 4 : 0, arm = Math.round(Math.sin(t * 7) * 1.5);
+  const skin = '#f1c27d', hair = '#7a4a1e', jer = '#d62828', sh = '#1d3557', boot = '#111';
+  g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(x - 8, y, 16, 2);
+  g.fillStyle = skin; g.fillRect(x - 4, y - 9, 3, 9); g.fillStyle = '#fff'; g.fillRect(x - 4, y - 5, 3, 3); g.fillStyle = boot; g.fillRect(x - 5, y - 2, 5, 2);
+  g.fillStyle = skin; g.fillRect(x + 1, y - 9 - lift, 3, 9); g.fillStyle = '#fff'; g.fillRect(x + 1, y - 5 - lift, 3, 3); g.fillStyle = boot; g.fillRect(x + 1, y - 2 - lift, 5, 2);
+  g.fillStyle = sh; g.fillRect(x - 5, y - 14, 10, 5);
+  g.fillStyle = jer; g.fillRect(x - 5, y - 24, 10, 10); g.fillStyle = '#fff'; g.fillRect(x - 1, y - 24, 2, 10); g.fillRect(x - 5, y - 24, 10, 1);
+  g.fillStyle = skin; g.fillRect(x - 8, y - 23 + arm, 3, 7); g.fillRect(x + 5, y - 23 - arm, 3, 7);
+  g.fillStyle = jer; g.fillRect(x - 8, y - 23 + arm, 3, 3); g.fillRect(x + 5, y - 23 - arm, 3, 3);
+  g.fillStyle = skin; g.fillRect(x - 4, y - 33, 8, 9);
+  g.fillStyle = hair; g.fillRect(x - 5, y - 35, 10, 4); g.fillRect(x - 5, y - 33, 2, 4); g.fillRect(x - 8, y - 32, 3, 6); g.fillRect(x - 9, y - 27, 2, 3);
+  g.fillStyle = '#111'; g.fillRect(x + 1, y - 30, 1, 2); g.fillRect(x + 3, y - 30, 1, 2); g.fillStyle = '#b5523b'; g.fillRect(x + 1, y - 27, 3, 1);
+  const bx = Math.round(x + 4 + Math.sin(phase * 6.28) * 2), by = Math.round(y - 5 - ballH);
+  g.fillStyle = '#fff'; g.fillRect(bx - 2, by - 2, 5, 5); g.fillStyle = '#111'; g.fillRect(bx - 1, by - 1, 2, 2); g.fillRect(bx - 2, by + 2, 1, 1); g.fillRect(bx + 2, by - 2, 1, 1);
+}
+
+function pxTitle(g, line1, line2, x, y, s1, s2, center) {
+  g.textBaseline = 'alphabetic'; g.textAlign = center ? 'center' : 'left';
+  const draw = (txt, size, yy) => {
+    g.font = `900 ${size}px "Arial Black", Impact, "Arial Narrow Bold", sans-serif`;
+    g.fillStyle = '#000'; for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [2, 2], [3, 3]]) g.fillText(txt, x + dx, yy + dy);
+    g.fillStyle = '#b0201f'; g.fillText(txt, x + 2, yy + 2);
+    g.fillStyle = '#ffd23f'; g.fillText(txt, x, yy);
+    g.fillStyle = 'rgba(255,255,255,0.35)'; g.save(); g.beginPath(); g.rect(0, yy - size, 240, size * 0.35); g.clip(); g.fillText(txt, x, yy); g.restore();
+  };
+  draw(line1, s1, y); draw(line2, s2, y + s2 * 0.95);
+}
+
+function drawMenuScene() {
+  if (!PXBG) buildPixelBG();
+  const t = performance.now() / 1000;
+  pg.imageSmoothingEnabled = false; pg.clearRect(0, 0, 240, 135); pg.drawImage(PXBG, 0, 0);
+  if (sceneMode === 'loading') { pxTitle(pg, 'FC SOCCER', 'BROS', 120, 40, 25, 38, true); drawPixelGuy(pg, 120, 120, t); }
+  else if (sceneMode === 'menu') { pxTitle(pg, 'FC SOCCER', 'BROS', 10, 30, 17, 26, false); drawPixelGuy(pg, 188, 122, t); }
+  else drawPixelGuy(pg, 214, 124, t);
+  ctx.imageSmoothingEnabled = false; ctx.drawImage(PXC, 0, 0, W, H);
+  if (sceneMode === 'sub') { ctx.fillStyle = 'rgba(4,8,28,0.55)'; ctx.fillRect(0, 0, W, H); }
+}
+
+/* ---------------- UI helpers ---------------- */
+function go(html, acts, cls) {
+  uiEl.innerHTML = `<div class="screen ${cls || ''}">${html}</div>`;
+  const scr = uiEl.firstChild;
+  scr.querySelectorAll('[data-act]').forEach(el => el.addEventListener('click', () => { Snd.init(); Snd.tick(); const f = acts && acts[el.dataset.act]; if (f) f(el); }));
+  return scr;
+}
+const STAT_KEYS = [['pace', 'PAC'], ['shot', 'SHO'], ['pass', 'PAS'], ['def', 'DEF'], ['jump', 'JMP']];
+const tierClass = p => p.tier.replace(' ', '');
+const flagOf = p => (TEAMS[p.nation] && TEAMS[p.nation].flag) || '🏳️';
+const clubName = p => (TEAMS[p.club] && p.club !== 'OTH') ? TEAMS[p.club].name : '';
+function faceSVG(p, s) {
+  const hair = { short: '<path d="M-11 -2 A11 11 0 0 1 11 -2 L11 -5 A11 11 0 0 0 -11 -5Z"/>', buzz: '<path opacity=".6" d="M-11 -2 A11 11 0 0 1 11 -2 L11 -5 A11 11 0 0 0 -11 -5Z"/>', curly: '<circle cx="-7" cy="-9" r="5"/><circle cx="0" cy="-12" r="5"/><circle cx="7" cy="-9" r="5"/>', long: '<path d="M-12 -4 A12 12 0 0 1 12 -4 L12 8 L8 8 L8 -3 L-8 -3 L-8 8 L-12 8Z"/>', afro: '<circle cx="0" cy="-5" r="14"/>', slick: '<path d="M-11 -2 A11 11 0 0 1 11 -2 L11 -6 A11 11 0 0 0 -11 -6Z"/>', mohawk: '<path d="M-6 -9 L-3 -17 L0 -10 L3 -17 L6 -9Z"/>', bald: '' }[p.hairStyle] || '';
+  return `<svg viewBox="-15 -17 30 32" width="${s}" height="${s}"><g fill="${p.hairColor}">${p.hairStyle === 'afro' ? hair : ''}</g><circle r="11" fill="${p.skinTone}"/><g fill="${p.hairColor}">${p.hairStyle === 'afro' ? '' : hair}</g><circle cx="-3.5" cy="1" r="1.6" fill="#111"/><circle cx="3.5" cy="1" r="1.6" fill="#111"/><path d="M-3 6 Q0 8.5 3 6" stroke="#0007" fill="none"/></svg>`;
+}
+function cardHTML(p, o) {
+  o = o || {}; const b = o.boost || 0, q = b ? boosted(p, b) : p;
+  return `<div class="card ${tierClass(p)} ${o.sel ? 'sel' : ''}" data-pid="${p.id}" ${o.act ? `data-act="${o.act}"` : ''}>
+    <div class="ovr">${q.ovr}</div><div class="pos">${p.pos}</div><div class="flag">${flagOf(p)}</div><div class="face">${faceSVG(p, 52)}</div>
+    <div class="nm">${esc(p.name.replace(' (Prime)', ''))}</div><div class="club">${esc(clubName(p))}</div>
+    <div class="st">${STAT_KEYS.map(k => `<span>${k[1]} <b>${q.stats[k[0]]}</b></span>`).join('')}</div>
+    <div class="tag">${b ? '+' + b + ' CHEM' : (p.tier === 'Prime Icon' ? 'PRIME ICON' : p.tier === 'Icon' ? 'ICON' : '')}</div></div>`;
+}
+const colorDot = id => { const T = TEAMS[id] || TEAMS.OTH; return `<span class="dot" style="background:${T.c1};border-color:${T.c2}"></span>`; };
+
+// Searchable player picker. o: { title, onPick(pd|null), onBack, exclude:Set, allowGK, pool, skipLabel }
+function showPicker(o) {
+  sceneMode = 'sub';
+  const positions = ['ALL', 'ST', 'CF', 'LW', 'RW', 'CAM', 'CM', 'LB', 'CB', 'RB'].concat(o.allowGK ? ['GK'] : []);
+  const scr = go(`<h2>${esc(o.title)}</h2><div class="row"><input type="text" id="pq" placeholder="Search name, club or nation..." style="min-width:260px"><select id="pp">${positions.map(p => `<option>${p}</option>`).join('')}</select>${o.skipLabel ? `<button class="btn alt" data-act="skip">${esc(o.skipLabel)}</button>` : ''}<button class="btn dim" data-act="back">Back</button></div><div class="small" style="text-align:center">Showing the top 40 matches by rating. Keepers are always AI-controlled.</div><div class="cards" id="pg"></div>`,
+    { back: () => o.onBack && o.onBack(), skip: () => o.onPick(null) });
+  const pool = o.pool || Object.values(PLAYERS).filter(p => !p.generated);
+  const grid = scr.querySelector('#pg');
+  const refresh = () => {
+    const q = scr.querySelector('#pq').value.toLowerCase().trim(), pos = scr.querySelector('#pp').value;
+    const list = pool.filter(p => (o.allowGK || p.pos !== 'GK') && !(o.exclude && o.exclude.has(p.id)) && (pos === 'ALL' || p.pos === pos) &&
+      (!q || (p.name + ' ' + clubName(p) + ' ' + (p.nationName || '')).toLowerCase().includes(q))).sort((a, b) => b.ovr - a.ovr).slice(0, 40);
+    grid.innerHTML = list.length ? list.map(p => cardHTML(p)).join('') : '<p class="sub">No players match.</p>';
+    grid.querySelectorAll('.card').forEach(c => c.addEventListener('click', () => { Snd.tick(); o.onPick(PLAYERS[c.dataset.pid]); }));
+  };
+  scr.querySelector('#pq').addEventListener('input', refresh); scr.querySelector('#pp').addEventListener('change', refresh); refresh();
+}
+
+// Team picker (clubs by league, national teams, Classic Icons XI). o: { title, onPick(teamId), onBack, nationsOnly }
+const teamAvgCache = {};
+const teamAvg = id => teamAvgCache[id] || (teamAvgCache[id] = Math.round(squadFor(id).slice(0, 8).reduce((a, p) => a + p.ovr, 0) / Math.max(1, Math.min(8, squadFor(id).length))) || 70);
+function showTeamPicker(o) {
+  sceneMode = 'sub';
+  const cats = o.nationsOnly ? ['National Teams'] : LEAGUES.concat(['National Teams', 'Classic Icons XI']);
+  const scr = go(`<h2>${esc(o.title)}</h2><div class="row"><label>Category</label><select id="cat">${cats.map(c => `<option>${c}</option>`).join('')}</select><button class="btn dim" data-act="back">Back</button></div><div class="grid" id="tg"></div>`, { back: () => o.onBack && o.onBack() });
+  const grid = scr.querySelector('#tg');
+  const refresh = () => {
+    const c = scr.querySelector('#cat').value;
+    const list = c === 'National Teams' ? NATIONS : c === 'Classic Icons XI' ? [TEAMS.ICONS] : CLUBS.filter(t => t.league === c);
+    grid.innerHTML = list.map(t => `<div class="teamchip" data-id="${t.id}">${colorDot(t.id)}${t.flag && t.kind === 'nation' ? t.flag + ' ' : ''}<b>${esc(t.name)}</b><div class="small">Top-8 avg OVR ${teamAvg(t.id)}</div></div>`).join('');
+    grid.querySelectorAll('.teamchip').forEach(el => el.addEventListener('click', () => { Snd.tick(); o.onPick(el.dataset.id); }));
+  };
+  scr.querySelector('#cat').addEventListener('change', refresh); refresh();
+}
+
+/* ---------------- match launcher (builds full 11-a-side squads) ---------------- */
+function launchMatch(spec) {
+  const used = new Set(); (spec.picks0 || []).concat(spec.picks1 || []).forEach(p => used.add(p.id));
+  const sides = [buildSide(spec.team0, spec.picks0, used), buildSide(spec.team1, spec.picks1, used)];
+  if (spec.mutate) spec.mutate(sides);
+  const humans = spec.humans.map((h, i) => {
+    const li = h.pd ? sides[h.team].lineup.findIndex(e => e.pd.id === h.pd.id) : -1;
+    return { ctl: mkCtl('keys', h.scheme), team: h.team, idx: li >= 0 ? li : KICKER, locked: !!h.lock && li >= 0, label: h.label, color: h.color || COLORS[i] };
+  });
+  startMatch({ sides, humans, lvls: [1, spec.lvl || 1], halfLen: spec.halfLen || 120, golden: !!spec.golden, startScore: spec.startScore, labels: spec.labels, onEnd: spec.onEnd, onQuit: spec.onQuit });
+}
+function showResult(res, o) {
+  sceneMode = 'sub';
+  const w = res.winner === 0 ? (o.home || 'HOME') + ' WIN' : res.winner === 1 ? (o.away || 'AWAY') + ' WIN' : 'DRAW';
+  go(`<h2>${esc(o.title || 'FULL TIME')}</h2><div class="codebox">${res.h} - ${res.a}</div><p class="sub">${esc(o.home || 'Home')} vs ${esc(o.away || 'Away')} · <b>${w}</b>${res.pens ? ' (on penalties)' : ''}</p>${o.extra || ''}
+    <div class="menu">${o.buttons.map((b, i) => `<button class="btn ${b[2] || ''}" data-act="b${i}">${esc(b[0])}</button>`).join('')}</div>`,
+    Object.fromEntries(o.buttons.map((b, i) => ['b' + i, b[1]])));
+}
+
+/* ---------------- loading screen + main menu ---------------- */
+function showLoading() {
+  sceneMode = 'loading';
+  const tips = ['TIP: Space + Up/Down = pass. Space alone = shoot.', 'TIP: Hit the gold SWEET zone for a blazing power shot.', 'TIP: Modric + Rakitic in Ultimate Team = Croatia Hyper-Link!', 'TIP: Hold Shift to sprint. Watch the stamina ring.', 'TIP: Tap Space without the ball to slide tackle.', 'TIP: Up to 8 friends can play online with one lobby code.'];
+  go(`<div class="loadbox"><div class="tip" id="ltip">${tips[0]}</div><div class="lbar"><i id="lfill"></i></div><div class="lpress hidden" id="lpress">PRESS ANY KEY OR CLICK TO START</div></div>`, {}, 'bare loading');
+  let pct = 0, done = false;
+  const go2 = () => { if (!done) return; removeEventListener('keydown', go2); removeEventListener('pointerdown', go2); Snd.init(); Snd.whistle(); showMain(); };
+  const iv = setInterval(() => {
+    pct = Math.min(100, pct + rnd(2, 6)); const f = $('#lfill'); if (!f) { clearInterval(iv); return; }
+    f.style.width = pct + '%'; $('#ltip').textContent = tips[Math.min(tips.length - 1, Math.floor(pct / 17))];
+    if (pct >= 100) { clearInterval(iv); done = true; $('#lpress').classList.remove('hidden'); $('.lbar').classList.add('full'); addEventListener('keydown', go2); addEventListener('pointerdown', go2); }
+  }, 90);
+}
+
+function showMain() {
+  sceneMode = 'menu'; Net.close(); ONL.view = null;
+  const items = [['quick', 'QUICK MATCH', 'Full 11v11. Play the CPU or a friend on one keyboard.'], ['online', 'ONLINE (UP TO 8)', 'Lobby code multiplayer. Everyone picks their own player.'], ['wc', 'WORLD CUP', '48 nations, 12 groups, knockouts all the way to the Final.'], ['story', 'ROAD TO GLORY', 'Create your Bro and play a 6-chapter story.'], ['ut', 'ULTIMATE TEAM', 'Open packs, build chemistry links, climb the ladder.'], ['help', 'HOW TO PLAY', 'Controls and tips.']];
+  const scr = go(`<div class="fclist">${items.map(i => `<div class="fcitem" data-act="${i[0]}" data-desc="${i[2]}"><span>${i[1]}</span></div>`).join('')}</div><div class="fcdesc" id="fcdesc">${items[0][2]}</div>`,
+    { quick: showQuick, online: showOnlineMenu, wc: showWorldCup, story: showStory, ut: showUT, help: showHelp }, 'fcmenu');
+  scr.querySelectorAll('.fcitem').forEach(el => el.addEventListener('mouseenter', () => { $('#fcdesc').textContent = el.dataset.desc; }));
+}
+
+function showHelp() {
+  sceneMode = 'sub';
+  go(`<h2>How to Play</h2><table class="table">
+    <tr><th>Action</th><th>Keys</th></tr>
+    <tr><td>Move</td><td><span class="kbd">Arrow Keys</span> (or WASD)</td></tr>
+    <tr><td>Shoot (with ball)</td><td>Hold <span class="kbd">Space</span>, release in the <b>gold SWEET zone</b>. Press <span class="kbd">Up</span>/<span class="kbd">Down</span> while charging to aim the laser.</td></tr>
+    <tr><td>Pass</td><td>Tap <span class="kbd">Space</span> while holding <span class="kbd">Up</span> or <span class="kbd">Down</span> - it snaps to the open teammate that way. Add <span class="kbd">C</span> for a lobbed ball. 95+ PASS players curl Trivelas.</td></tr>
+    <tr><td>Slide tackle</td><td>Tap <span class="kbd">Space</span> without the ball</td></tr>
+    <tr><td>Jump / header / bicycle kick</td><td><span class="kbd">C</span>, then <span class="kbd">Space</span> in mid-air</td></tr>
+    <tr><td>Sprint</td><td>Hold <span class="kbd">Shift</span> (stamina ring under your player)</td></tr>
+    <tr><td>Switch player</td><td><span class="kbd">X</span> (only when controlling the whole team)</td></tr>
+    <tr><td>Pause</td><td><span class="kbd">Esc</span> or <span class="kbd">P</span></td></tr>
+    <tr><td>Local 2-Player</td><td>P1: <span class="kbd">WASD</span> + <span class="kbd">Space</span>, <span class="kbd">E</span> jump, <span class="kbd">Q</span> switch, <span class="kbd">L-Shift</span> sprint. P2: <span class="kbd">Arrows</span> + <span class="kbd">Enter</span>, <span class="kbd">.</span> jump, <span class="kbd">,</span> switch, <span class="kbd">R-Shift</span> sprint.</td></tr></table>
+    <div class="menu"><button class="btn" data-act="back">Back</button></div>`, { back: showMain });
+}
+
+/* ---------------- QUICK MATCH ---------------- */
+function showQuick() {
+  sceneMode = 'sub';
+  go(`<h2>Quick Match - 11v11</h2><div class="row"><label>Opponent</label><select id="qm">${['CPU', 'Local 2-Player (same keyboard)'].map((o, i) => `<option value="${i}">${o}</option>`).join('')}</select>
+    <label>Difficulty</label><select id="qd"><option value="0.6">Easy</option><option value="0.85" selected>Normal</option><option value="1">Hard</option></select>
+    <label>Half length</label><select id="qh"><option value="60">1:00</option><option value="120" selected>2:00</option><option value="180">3:00</option></select></div>
+    <div class="row"><label>Control</label><select id="ql"><option value="0">Whole team (auto-switch player)</option><option value="1">Lock to ONE player (Be-a-Pro)</option></select></div>
+    <p class="sub">Pick a team (the AI fills all 11 spots by position), then optionally pick the player you want to start as.</p>
+    <div class="menu"><button class="btn big" data-act="next">Next: Pick Teams</button><button class="btn dim" data-act="back">Back</button></div>`,
+    { back: showMain, next: () => {
+      const S = { local: $('#qm').value === '1', lvl: +$('#qd').value, half: +$('#qh').value, lock: $('#ql').value === '1' };
+      qmTeams(S);
+    } });
+}
+function qmTeams(S) {
+  showTeamPicker({ title: S.local ? 'Player 1: pick your team' : 'Pick YOUR team', onBack: showQuick, onPick: t0 =>
+    showTeamPicker({ title: S.local ? 'Player 2: pick your team' : 'Pick your OPPONENT', onBack: () => qmTeams(S), onPick: t1 => qmPlayers(Object.assign(S, { t0, t1 })) }) });
+}
+function qmPlayers(S) {
+  const p1 = pd => {
+    S.pd0 = pd;
+    if (!S.local) return qmPreview(S);
+    showPicker({ title: 'Player 2: pick your player (WASD is Player 1, Arrows are Player 2)', onBack: () => qmTeams(S), onPick: pd2 => { S.pd1 = pd2; qmPreview(S); }, exclude: new Set(pd ? [pd.id] : []) });
+  };
+  showPicker({ title: S.local ? 'Player 1: pick your player' : 'Pick your player', onBack: () => qmTeams(S), onPick: p1, skipLabel: 'Auto: control the whole team', exclude: new Set() });
+}
+function qmPreview(S) {
+  const n = id => TEAMS[id].name;
+  go(`<h2>${esc(n(S.t0))} vs ${esc(n(S.t1))}</h2><div class="row">${S.pd0 ? cardHTML(S.pd0) : '<div class="chem">P1: whole team</div>'}${S.pd1 ? cardHTML(S.pd1) : ''}</div>
+    <p class="sub">${S.local ? 'Local 2-Player' : 'Vs CPU'} · ${S.lock ? 'locked to one player' : 'auto-switch'} · all other players are AI</p>
+    <div class="menu"><button class="btn big" data-act="go">KICK OFF</button><button class="btn dim" data-act="back">Back</button></div>`, { back: () => qmPlayers(S), go: () => qmStart(S) });
+}
+function qmStart(S) {
+  const humans = [{ team: 0, pd: S.pd0, scheme: S.local ? 'p1' : 'solo', label: 'P1', lock: S.lock || (S.local && !!S.pd0) }];
+  if (S.local) humans.push({ team: 1, pd: S.pd1, scheme: 'p2', label: 'P2', lock: true });
+  launchMatch({ team0: S.t0, team1: S.t1, picks0: S.pd0 ? [S.pd0] : [], picks1: S.pd1 ? [S.pd1] : [], humans, lvl: S.lvl, halfLen: S.half,
+    onQuit: showQuick, onEnd: res => showResult(res, { home: TEAMS[S.t0].name, away: TEAMS[S.t1].name, buttons: [['Rematch', () => qmStart(S)], ['Change Teams', () => qmTeams(S), 'alt'], ['Main Menu', showMain, 'dim']] }) });
+}
+
+/* ---------------- ONLINE (host + up to 7 guests = 8 players) ---------------- */
+const ONL = { role: null, me: 'host', name: 'Bro', members: [], code: '', view: null, half: 120, netCtls: {} };
+const teamForPlayer = pd => pd.tier === 'Icon' || pd.tier === 'Prime Icon' ? 'ICONS' : (TEAMS[pd.club] && pd.club !== 'OTH' && pd.club !== 'ICN') ? pd.club : (TEAMS[pd.nation] ? pd.nation : 'RMA');
+
+function showOnlineMenu(msg) {
+  sceneMode = 'sub'; ONL.view = 'menu';
+  go(`<h2>Online Multiplayer</h2><p class="sub">Host a lobby and share the 5-letter code. Up to 8 players - everyone picks any player they want. If only 4 people play it's 2v2 with AI filling the other 18 spots by position.</p>
+    <div class="row"><label>Your name</label><input type="text" id="nm" maxlength="10" value="${esc(ONL.name)}"></div>
+    <div class="menu"><button class="btn big" data-act="host">Create Lobby</button>
+    <div class="row"><input type="text" id="jc" maxlength="5" placeholder="CODE" style="width:110px;text-transform:uppercase;text-align:center;font-size:22px"><button class="btn alt" data-act="join">Join Lobby</button></div>
+    <div class="small" id="err" style="color:#ef476f">${esc(msg || '')}</div><button class="btn dim" data-act="back">Back</button></div>`,
+    { back: showMain, host: () => { ONL.name = ($('#nm').value || 'Host').trim() || 'Host'; hostLobby(); }, join: () => { ONL.name = ($('#nm').value || 'Bro').trim() || 'Bro'; joinLobbyGuest($('#jc').value); } });
+}
+const balancedSide = () => ONL.members.filter(m => m.side === 0).length <= ONL.members.filter(m => m.side === 1).length ? 0 : 1;
+
+function hostLobby() {
+  ONL.role = 'host'; ONL.me = 'host'; ONL.netCtls = {}; ONL.members = [{ id: 'host', name: ONL.name, side: 0, pid: null }];
+  go('<h2>Creating lobby…</h2><p class="sub">Connecting to the PeerJS broker.</p>', {});
+  Net.createLobby({
+    onCode: code => { ONL.code = code; showLobby(); },
+    onJoin: id => { Net.sendTo(id, { t: 'welcome', you: id }); ONL.members.push({ id, name: 'Bro', side: balancedSide(), pid: null }); lobbyChanged(); },
+    onData: (id, msg) => onHostMsg(id, msg),
+    onLeave: id => { ONL.members = ONL.members.filter(m => m.id !== id); delete ONL.netCtls[id]; if (cur) cur.humans.forEach(h => { if (h.id === id) h.ctl = null; }); lobbyChanged(); },
+    onError: e => { Net.close(); showOnlineMenu('Could not create lobby: ' + e); },
+  });
+}
+function lobbyChanged() { Net.broadcast({ t: 'lobby', members: ONL.members, code: ONL.code }); if (ONL.view === 'lobby') showLobby(); }
+function onHostMsg(id, msg) {
+  const m = ONL.members.find(x => x.id === id);
+  if (msg.t === 'in') { const c = ONL.netCtls[id]; if (c) { c.net = msg.h; c.ev = Object.assign(c.ev || {}, msg.ev); } return; }
+  if (!m) return;
+  if (msg.t === 'hello') { m.name = String(msg.name || 'Bro').slice(0, 10); lobbyChanged(); }
+  else if (msg.t === 'pick') {
+    if (msg.side === 0 || msg.side === 1) m.side = msg.side;
+    if (msg.pid && PLAYERS[msg.pid] && !ONL.members.some(o => o !== m && o.pid === msg.pid)) m.pid = msg.pid;
+    lobbyChanged();
+  }
+}
+function joinLobbyGuest(code) {
+  ONL.role = 'guest'; ONL.members = []; ONL.me = null;
+  go('<h2>Joining…</h2><p class="sub">Looking for that lobby.</p>', {});
+  Net.joinLobby(code, {
+    onOpen: () => Net.send({ t: 'hello', name: ONL.name }),
+    onData: onGuestMsg,
+    onClose: () => { if (cur) stopMatch(); showOnlineMenu('The host left the lobby.'); },
+    onError: e => { Net.close(); showOnlineMenu(e); },
+  });
+}
+function onGuestMsg(msg) {
+  if (msg.t === 'welcome') ONL.me = msg.you;
+  else if (msg.t === 'full') { Net.close(); showOnlineMenu('That lobby is full (8 players max).'); }
+  else if (msg.t === 'lobby') { ONL.members = msg.members; ONL.code = msg.code; if (ONL.view !== 'match' && ONL.view !== 'picker' && ONL.view !== 'result') showLobby(); }
+  else if (msg.t === 'start') startOnlineGuest(msg.cfg);
+  else if (msg.t === 's') { if (cur && cur.net && cur.net.role === 'guest') applySnap(cur, msg); }
+  else if (msg.t === 'end') { if (cur) stopMatch(); showOnlineResult(msg.res); }
+}
+
+function showLobby() {
+  sceneMode = 'sub'; ONL.view = 'lobby';
+  const me = ONL.members.find(m => m.id === ONL.me) || ONL.members[0], isHost = ONL.role === 'host';
+  const ready = ONL.members.every(m => m.pid);
+  const rows = ONL.members.map((m, i) => { const p = m.pid && PLAYERS[m.pid];
+    return `<tr class="${m === me ? 'me' : ''}"><td><span class="dot" style="background:${COLORS[i % 8]};display:inline-block;width:12px;height:12px;border-radius:50%"></span> ${esc(m.name)}${m.id === 'host' ? ' (host)' : ''}${m === me ? ' (you)' : ''}</td><td>${m.side === 0 ? 'Team A' : 'Team B'}</td><td>${p ? `${esc(p.name.replace(' (Prime)', ''))} · ${p.pos} · ${p.ovr}` : '<i>not picked</i>'}</td></tr>`; }).join('');
+  const aiA = 11 - ONL.members.filter(m => m.side === 0).length, aiB = 11 - ONL.members.filter(m => m.side === 1).length;
+  go(`<h2>Lobby ${isHost ? '' : '(joined)'}</h2><div class="codebox">${esc(ONL.code || '…')}</div><p class="sub">Share this code. ${ONL.members.length}/8 players · AI fills ${aiA} spots on Team A and ${aiB} on Team B.</p>
+    <table class="table"><tr><th>Player</th><th>Side</th><th>Picked</th></tr>${rows}</table>
+    <div class="row"><button class="btn alt" data-act="sideA">Join Team A</button><button class="btn alt" data-act="sideB">Join Team B</button><button class="btn" data-act="pick">${me && me.pid ? 'Change Player' : 'Pick My Player'}</button></div>
+    <div class="menu">${isHost ? `<button class="btn big" data-act="start" ${ready ? '' : 'disabled style="opacity:.5"'}>Start Match</button>${ready ? '' : '<div class="small">Everyone must pick a player first.</div>'}
+      <div class="row"><label>Half length</label><select id="hl"><option value="60">1:00</option><option value="120" ${ONL.half === 120 ? 'selected' : ''}>2:00</option><option value="180">3:00</option></select></div>` : '<div class="small">Waiting for the host to start…</div>'}
+    <button class="btn dim" data-act="leave">Leave Lobby</button></div>`,
+    { sideA: () => setMySide(0), sideB: () => setMySide(1), pick: lobbyPick, start: () => { if (ready) { ONL.half = +$('#hl').value; hostStart(); } }, leave: () => { Net.close(); showMain(); } });
+}
+function setMySide(s) {
+  if (ONL.role === 'host') { const m = ONL.members[0]; m.side = s; lobbyChanged(); }
+  else { const me = ONL.members.find(m => m.id === ONL.me); Net.send({ t: 'pick', side: s, pid: me && me.pid }); }
+}
+function lobbyPick() {
+  ONL.view = 'picker';
+  const me = ONL.members.find(m => m.id === ONL.me) || ONL.members[0];
+  const taken = new Set(ONL.members.filter(m => m !== me && m.pid).map(m => m.pid));
+  showPicker({ title: 'Pick your player (any position except GK)', exclude: taken, onBack: () => { ONL.view = 'lobby'; showLobby(); },
+    onPick: pd => {
+      if (ONL.role === 'host') { me.pid = pd.id; ONL.view = 'lobby'; lobbyChanged(); showLobby(); }
+      else { Net.send({ t: 'pick', side: me.side, pid: pd.id }); ONL.view = 'lobby'; showLobby(); }
+    } });
+}
+function hostStart() {
+  const ms = ONL.members; if (ms.some(m => !m.pid)) return;
+  const teams = [0, 1].map(s => { const f = ms.find(m => m.side === s); return f ? teamForPlayer(PLAYERS[f.pid]) : (s === 0 ? 'RMA' : 'MCI'); });
+  if (teams[0] === teams[1]) teams[1] = teams[0] === 'MCI' ? 'RMA' : 'MCI';
+  const picks = [0, 1].map(s => ms.filter(m => m.side === s).map(m => PLAYERS[m.pid]));
+  const used = new Set(); picks[0].concat(picks[1]).forEach(p => used.add(p.id));
+  const sides = [buildSide(teams[0], picks[0], used), buildSide(teams[1], picks[1], used)];
+  const humans = ms.map((m, i) => ({ id: m.id, team: m.side, idx: Math.max(0, sides[m.side].lineup.findIndex(e => e.pd.id === m.pid)), locked: true, label: m.name.slice(0, 5), color: COLORS[i % 8] }));
+  ONL.netCtls = {};
+  const hostHumans = humans.map(h => Object.assign({}, h, { ctl: h.id === 'host' ? mkCtl('keys', 'solo') : (ONL.netCtls[h.id] = mkCtl('net')) }));
+  Net.broadcast({ t: 'start', cfg: { sides, humans, halfLen: ONL.half } });
+  ONL.view = 'match';
+  startMatch({ sides, humans: hostHumans, lvls: [1, 1], halfLen: ONL.half, net: { role: 'host' }, labels: ['Team A', 'Team B'], onEnd: showOnlineResult });
+}
+function startOnlineGuest(cfg) {
+  ONL.view = 'match';
+  startMatch({ sides: cfg.sides, humans: cfg.humans.map(h => Object.assign({}, h, { ctl: null })), lvls: [1, 1], halfLen: cfg.halfLen, net: { role: 'guest' }, guestCtl: mkCtl('keys', 'solo'), labels: ['Team A', 'Team B'] });
+}
+function showOnlineResult(res) {
+  ONL.view = 'result';
+  const btns = [['Back to Lobby', () => { ONL.view = 'lobby'; showLobby(); }, 'alt'], ['Leave', () => { Net.close(); showMain(); }, 'dim']];
+  if (ONL.role === 'host') btns.unshift(['Rematch', () => hostStart()]);
+  showResult(res, { title: 'FULL TIME', home: 'Team A', away: 'Team B', buttons: btns });
+}
+
+/* ---------------- WORLD CUP (48 nations, 12 groups of 4, 32-team knockout) ---------------- */
+let WC = null;
+const poisson = l => { const L = Math.exp(-l); let k = 0, p = 1; do { k++; p *= Math.random(); } while (p > L); return k - 1; };
+function simScore(a, b) { const d = (teamAvg(a) - teamAvg(b)) / 12; return [poisson(1.35 * Math.exp(d * 0.5)), poisson(1.35 * Math.exp(-d * 0.5))]; }
+function simKO(a, b) { let [x, y] = simScore(a, b); if (x === y) { if (Math.random() < 0.5 + (teamAvg(a) - teamAvg(b)) / 80) x++; else y++; } return x > y ? a : b; }
+const GROUP_ROUNDS = [[[0, 1], [2, 3]], [[0, 2], [1, 3]], [[0, 3], [1, 2]]];
+const GROUP_NAMES = 'ABCDEFGHIJKL';
+
+function showWorldCup() {
+  sceneMode = 'sub';
+  showTeamPicker({ title: 'World Cup: pick your nation', nationsOnly: true, onBack: showMain, onPick: wcSetup });
+}
+function wcSetup(user) {
+  const ids = shuffle(NATIONS.map(n => n.id));
+  WC = { user, groups: [], st: {}, round: 0, stage: 'group' };
+  for (let g = 0; g < 12; g++) WC.groups.push(ids.slice(g * 4, g * 4 + 4));
+  ids.forEach(id => WC.st[id] = { p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0 });
+  wcGroups();
+}
+function wcRecord(a, b, x, y) {
+  const A = WC.st[a], B = WC.st[b]; A.p++; B.p++; A.gf += x; A.ga += y; B.gf += y; B.ga += x;
+  if (x > y) { A.w++; A.pts += 3; B.l++; } else if (x < y) { B.w++; B.pts += 3; A.l++; } else { A.d++; B.d++; A.pts++; B.pts++; }
+}
+const wcSort = ids => ids.slice().sort((a, b) => { const A = WC.st[a], B = WC.st[b]; return (B.pts - A.pts) || ((B.gf - B.ga) - (A.gf - A.ga)) || (B.gf - A.gf) || 0; });
+function wcTable(g) {
+  return `<table class="table"><tr><th>Group ${GROUP_NAMES[g]}</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th></tr>${wcSort(WC.groups[g]).map(id => { const s = WC.st[id]; return `<tr class="${id === WC.user ? 'me' : ''}"><td>${TEAMS[id].flag} ${esc(TEAMS[id].name)}</td><td>${s.p}</td><td>${s.w}</td><td>${s.d}</td><td>${s.l}</td><td>${s.gf - s.ga}</td><td><b>${s.pts}</b></td></tr>`; }).join('')}</table>`;
+}
+function wcGroups() {
+  const ug = WC.groups.findIndex(g => g.includes(WC.user)), grp = WC.groups[ug], ui = grp.indexOf(WC.user);
+  const fx = GROUP_ROUNDS[WC.round].find(f => f.includes(ui)), opp = grp[fx[0] === ui ? fx[1] : fx[0]];
+  go(`<h2>World Cup - Group Stage</h2><p class="sub">Matchday ${WC.round + 1} of 3 · You: ${TEAMS[WC.user].flag} ${esc(TEAMS[WC.user].name)}</p>${wcTable(ug)}
+    <div class="menu"><button class="btn big" data-act="play">Play vs ${TEAMS[opp].flag} ${esc(TEAMS[opp].name)}</button><button class="btn alt" data-act="all">View all groups</button><button class="btn dim" data-act="quit">Quit Tournament</button></div>`,
+    { play: () => wcPlay(opp, false, res => {
+        const x = res.h, y = res.a; wcRecord(WC.user, opp, x, y);
+        WC.groups.forEach((g, gi) => GROUP_ROUNDS[WC.round].forEach(f => { const a = g[f[0]], b = g[f[1]]; if (a === WC.user || b === WC.user) return; const [s, t] = simScore(a, b); wcRecord(a, b, s, t); }));
+        WC.round++;
+        if (WC.round < 3) wcGroups(); else wcQualify();
+      }), all: wcAllGroups, quit: showMain });
+}
+function wcAllGroups() {
+  go(`<h2>All Groups</h2><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr))">${WC.groups.map((g, i) => wcTable(i)).join('')}</div><div class="menu"><button class="btn" data-act="back">Back</button></div>`, { back: () => (WC.stage === 'group' ? wcGroups() : wcKnockout()) });
+}
+function wcPlay(opp, ko, done) {
+  launchMatch({ team0: WC.user, team1: opp, picks0: [], picks1: [], humans: [{ team: 0, scheme: 'solo', label: 'P1', lock: false }], lvl: 0.85, halfLen: 90, golden: ko, labels: [TEAMS[WC.user].name, TEAMS[opp].name],
+    onQuit: () => (WC.stage === 'group' ? wcGroups() : wcKnockout()),
+    onEnd: res => showResult(res, { title: ko ? 'KNOCKOUT' : 'FULL TIME', home: TEAMS[WC.user].name, away: TEAMS[opp].name, buttons: [['Continue', () => done(res)]] }) });
+}
+function wcQualify() {
+  const thirds = [], q = [];
+  WC.groups.forEach(g => { const s = wcSort(g); q.push(s[0], s[1]); thirds.push(s[2]); });
+  q.push(...wcSort(thirds).slice(0, 8));
+  if (!q.includes(WC.user)) {
+    const ug = WC.groups.findIndex(g => g.includes(WC.user));
+    go(`<h2>Eliminated</h2><p class="sub">${TEAMS[WC.user].flag} ${esc(TEAMS[WC.user].name)} didn't make the top 32.</p>${wcTable(ug)}<div class="menu"><button class="btn" data-act="again">Try Again</button><button class="btn dim" data-act="menu">Main Menu</button></div>`, { again: showWorldCup, menu: showMain });
+    return;
+  }
+  WC.stage = 'ko'; WC.ko = { teams: shuffle(q), round: 0 }; wcKnockout();
+}
+const KO_NAMES = ['Round of 32', 'Round of 16', 'Quarter-Final', 'Semi-Final', 'FINAL'];
+function wcKnockout() {
+  const k = WC.ko, t = k.teams, pairs = []; for (let i = 0; i < t.length; i += 2) pairs.push([t[i], t[i + 1]]);
+  const mine = pairs.find(p => p.includes(WC.user)), opp = mine[0] === WC.user ? mine[1] : mine[0];
+  const others = pairs.filter(p => p !== mine);
+  go(`<h2>${KO_NAMES[k.round]}</h2><p class="sub">${t.length} teams left · golden goal if tied</p>
+    <table class="table">${others.map(p => `<tr><td>${TEAMS[p[0]].flag} ${esc(TEAMS[p[0]].name)}</td><td>vs</td><td>${TEAMS[p[1]].flag} ${esc(TEAMS[p[1]].name)}</td></tr>`).join('')}</table>
+    <div class="menu"><button class="btn big" data-act="play">Play vs ${TEAMS[opp].flag} ${esc(TEAMS[opp].name)}</button><button class="btn dim" data-act="quit">Quit Tournament</button></div>`,
+    { quit: showMain, play: () => wcPlay(opp, true, res => {
+        const win = res.winner === 0;
+        if (!win) { WC.ko = null; go(`<h2>Knocked Out</h2><p class="sub">Out in the ${KO_NAMES[k.round]} (${res.h}-${res.a}${res.pens ? ' pens' : ''}).</p><div class="menu"><button class="btn" data-act="again">New Tournament</button><button class="btn dim" data-act="menu">Main Menu</button></div>`, { again: showWorldCup, menu: showMain }); return; }
+        const next = others.map(p => simKO(p[0], p[1])); next.push(WC.user);
+        if (k.round === 4) { wcTrophy(); return; }
+        k.teams = shuffle(next); k.round++; wcKnockout();
+      }) });
+}
+function wcTrophy() {
+  Snd.roar(); Snd.chime();
+  const conf = Array.from({ length: 50 }, () => `<i style="left:${rnd(0, 100)}%;animation-delay:${rnd(0, 3)}s;background:${pick(COLORS)}"></i>`).join('');
+  go(`<div class="confetti">${conf}</div><div style="text-align:center"><div style="font-size:110px">🏆</div><h1 class="logo">WORLD <span>CHAMPIONS</span></h1><p class="sub">${TEAMS[WC.user].flag} ${esc(TEAMS[WC.user].name)} lift the trophy!</p><div class="menu"><button class="btn big" data-act="menu">Main Menu</button></div></div>`, { menu: showMain });
+}
+
+/* ---------------- STORY MODE: ROAD TO GLORY ---------------- */
+const SAVE_KEY = 'fcbros_save_v2';
+function defaultSave() { return { coins: 1500, owned: [], squad: [], wins: 0, story: { created: false, bro: null, chapter: 0, xp: 0 } }; }
+function loadSave() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s) return Object.assign(defaultSave(), s); } catch (e) {} return defaultSave(); }
+let save = loadSave();
+function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
+
+const CHAPTERS = [
+  { t: 'Rookie Trials', intro: 'Prove yourself in your first real match.', my: 'AJA', opp: 'OM', mates: [], start: [0, 0], half: 90, lvl: 0.6, golden: false },
+  { t: 'Derby Day', intro: 'The big local derby. Don\'t bottle it.', my: 'ARS', opp: 'TOT', mates: [], start: [0, 0], half: 90, lvl: 0.75, golden: false },
+  { t: 'Croatian Midfield Masterclass', intro: 'Play alongside Prime Luka Modric (96) and Ivan Rakitic (88) against Spain.', my: 'CRO', opp: 'ESP', mates: ['modric_prime', 'rakitic_icon'], start: [0, 0], half: 90, lvl: 0.85, golden: false },
+  { t: 'Champions League Comeback', intro: 'Down 0-2 to Real Madrid. Bring it back!', my: 'LIV', opp: 'RMA', mates: [], start: [0, 2], half: 75, lvl: 0.85, golden: true },
+  { t: 'Icons Challenge', intro: 'Face the Classic Icons XI. Legends never die.', my: 'BAR', opp: 'ICONS', mates: [], start: [0, 0], half: 90, lvl: 0.9, golden: true },
+  { t: 'World Cup Final', intro: 'The whole world is watching. Golden goal if tied.', my: 'USA', opp: 'ARG', mates: [], start: [0, 0], half: 90, lvl: 1, golden: true },
+];
+const SKIN_NAMES = ['Light', 'Fair', 'Tan', 'Brown', 'Dark brown', 'Deep'], HAIR_COL_NAMES = ['Black', 'Dark brown', 'Brown', 'Blond', 'Platinum', 'Grey', 'Ginger'];
+const broOvr = st => Math.min(97, Math.round(STAT_KEYS.reduce((a, k) => a + st[k[0]], 0) / 5));
+function broPd() {
+  const b = save.story.bro;
+  const pd = { id: 'bro', name: b.name, ovr: broOvr(b.stats), pos: 'CAM', nation: 'OTH', nationName: '', club: 'OTH', tier: 'Gold', stats: Object.assign({}, b.stats), skinTone: b.skin, hairStyle: b.hair, hairColor: b.hairColor };
+  PLAYERS.bro = pd; return pd;
+}
+function showStory() {
+  sceneMode = 'sub';
+  if (!save.story.created) return showBroCreator();
+  storyHub();
+}
+function showBroCreator() {
+  const opts = (arr, names) => arr.map((a, i) => `<option value="${i}">${names ? names[i] : a}</option>`).join('');
+  const scr = go(`<h2>Create your Bro</h2><div class="row"><div id="bprev"></div><div>
+    <div class="row"><label>Name</label><input type="text" id="bn" maxlength="12" value="Rookie"></div>
+    <div class="row"><label>Skin</label><select id="bs">${opts(SKINS, SKIN_NAMES)}</select><label>Hair</label><select id="bh">${opts(HAIR_STYLES)}</select><label>Colour</label><select id="bc">${opts(HAIR_COLORS, HAIR_COL_NAMES)}</select></div>
+    <p class="small">Starts as a 68 OVR CAM (PAC 72 · SHO 70 · PAS 68 · DEF 64 · JMP 66). Win chapters to earn XP and upgrade up to 97 OVR.</p></div></div>
+    <div class="menu"><button class="btn big" data-act="ok">Start Road to Glory</button><button class="btn dim" data-act="back">Back</button></div>`,
+    { back: showMain, ok: () => {
+      save.story = { created: true, chapter: 0, xp: 0, bro: { name: ($('#bn').value || 'Rookie').trim() || 'Rookie', skin: SKINS[+$('#bs').value], hair: HAIR_STYLES[+$('#bh').value], hairColor: HAIR_COLORS[+$('#bc').value], stats: { pace: 72, shot: 70, pass: 68, def: 64, jump: 66 } } };
+      persist(); storyHub();
+    } });
+  const prev = () => { scr.querySelector('#bprev').innerHTML = faceSVG({ skinTone: SKINS[+$('#bs').value], hairStyle: HAIR_STYLES[+$('#bh').value], hairColor: HAIR_COLORS[+$('#bc').value] }, 110); };
+  ['bs', 'bh', 'bc'].forEach(id => scr.querySelector('#' + id).addEventListener('change', prev)); prev();
+}
+function storyHub() {
+  const S = save.story, bro = broPd(), done = S.chapter;
+  const rows = STAT_KEYS.map(k => `<tr><td>${k[1]}</td><td><b>${S.bro.stats[k[0]]}</b></td><td><button class="btn alt" style="padding:3px 10px" data-act="up_${k[0]}">+1 (10 XP)</button></td></tr>`).join('');
+  const acts = { back: showMain, reset: () => { if (confirm('Delete your Bro and story progress?')) { save.story = defaultSave().story; persist(); showStory(); } } };
+  STAT_KEYS.forEach(k => acts['up_' + k[0]] = () => {
+    const st = S.bro.stats;
+    if (S.xp < 10 || st[k[0]] >= 99) return;
+    const test = Object.assign({}, st, { [k[0]]: st[k[0]] + 1 });
+    if (Math.round(STAT_KEYS.reduce((a, q) => a + test[q[0]], 0) / 5) > 97) return;
+    S.xp -= 10; st[k[0]]++; persist(); storyHub();
+  });
+  CHAPTERS.forEach((c, i) => acts['ch' + i] = () => storyPlay(i));
+  go(`<h2>Road to Glory</h2><div class="row">${cardHTML(bro)}<div><div class="chem">XP available: ${S.xp}</div><table class="table">${rows}</table></div></div>
+    <label><input type="checkbox" id="blk"> Be-a-Pro: control only my Bro (otherwise you control the whole team)</label>
+    <table class="table">${CHAPTERS.map((c, i) => `<tr><td>${i + 1}. <b>${esc(c.t)}</b><div class="small">${esc(c.intro)}${c.start[1] ? ' · starts ' + c.start[0] + '-' + c.start[1] : ''}</div></td><td>${i < done ? '✅' : i === done ? '▶' : '🔒'}</td><td>${i <= done ? `<button class="btn" style="padding:4px 12px" data-act="ch${i}">${i < done ? 'Replay' : 'Play'}</button>` : ''}</td></tr>`).join('')}</table>
+    ${done >= CHAPTERS.length ? '<div class="chem">🏆 Road to Glory complete! Keep replaying chapters for XP.</div>' : ''}
+    <div class="menu"><button class="btn dim" data-act="back">Back</button><button class="btn dim" data-act="reset">Reset Story</button></div>`, acts);
+}
+function storyPlay(i) {
+  const ch = CHAPTERS[i], bro = broPd(), lock = !!($('#blk') && $('#blk').checked);
+  launchMatch({ team0: ch.my, team1: ch.opp, picks0: [bro].concat(ch.mates.map(id => PLAYERS[id])), picks1: [], humans: [{ team: 0, pd: bro, scheme: 'solo', label: 'BRO', lock }], lvl: ch.lvl, halfLen: ch.half, golden: ch.golden, startScore: ch.start, labels: [save.story.bro.name, TEAMS[ch.opp].name], onQuit: storyHub,
+    onEnd: res => {
+      const win = res.winner === 0; let extra = '';
+      if (win) { const first = i === save.story.chapter; const xp = first ? 250 : 100; save.story.xp += xp; if (first) save.story.chapter++; persist(); extra = `<div class="chem">+${xp} XP${first && save.story.chapter >= CHAPTERS.length ? ' · ROAD TO GLORY COMPLETE!' : ''}</div>`; }
+      else extra = '<p class="sub">You need a win to progress. Try again!</p>';
+      showResult(res, { title: ch.t, home: save.story.bro.name + "'s side", away: TEAMS[ch.opp].name, extra, buttons: [[win ? 'Continue' : 'Retry', win ? storyHub : () => storyPlay(i)], ['Chapters', storyHub, 'dim']] });
+    } });
+}
+
+/* ---------------- ULTIMATE TEAM ("FC BROS UT 27") ---------------- */
+TEAMS.UT = { id: 'UT', name: 'My Club', c1: '#7b2cbf', c2: '#ffd23f', style: 'sash', kind: 'club' };
+let utReady = false;
+function initUT() {
+  if (utReady) return; utReady = true;
+  NATIONS.forEach(n => nationFiller(n));   // generates the Bronze/Silver depth cards deterministically
+  if (!save.owned.length) {
+    const all = Object.values(PLAYERS), bronze = all.filter(p => p.generated && p.nationName && p.ovr <= 68), silver = all.filter(p => !p.generated && p.ovr >= 76 && p.ovr <= 83 && p.tier !== 'Icon' && p.tier !== 'Prime Icon'), gold = all.filter(p => !p.generated && p.ovr >= 84 && p.ovr <= 88 && p.tier !== 'Icon' && p.tier !== 'Prime Icon');
+    const ids = new Set();
+    shuffle(bronze).slice(0, 9).concat(shuffle(silver).slice(0, 4), shuffle(gold).slice(0, 2)).forEach(p => ids.add(p.id));
+    save.owned = [...ids]; save.coins = Math.max(save.coins, 1500); persist();
+  }
+}
+const utPools = () => {
+  const all = Object.values(PLAYERS), star = p => !p.generated && p.tier !== 'Icon' && p.tier !== 'Prime Icon';
+  return {
+    bronze: all.filter(p => p.generated && p.nationName && p.ovr <= 66),
+    silver: all.filter(p => (p.generated && p.nationName && p.ovr >= 67) || (star(p) && p.ovr >= 75 && p.ovr <= 83)),
+    gold: all.filter(p => star(p) && p.ovr >= 84 && p.ovr < 93),
+    icon: all.filter(p => p.tier === 'Icon' || p.tier === 'Prime Icon' || (star(p) && p.ovr >= 93)),
+  };
+};
+function weighted(list, w) { let t = 0; const ws = list.map(p => { const x = w(p); t += x; return x; }); let r = Math.random() * t; for (let i = 0; i < list.length; i++) { r -= ws[i]; if (r <= 0) return list[i]; } return list[list.length - 1]; }
+const PACKS = {
+  bronze: { name: 'Bronze Pack', cost: 300, color: '#c98a5a', roll: P => Math.random() < 0.9 ? pick(P.bronze) : pick(P.silver) },
+  silver: { name: 'Silver Pack', cost: 700, color: '#c5ccd8', roll: P => Math.random() < 0.8 ? pick(P.silver) : pick(P.gold) },
+  gold: { name: 'Gold Pack', cost: 1800, color: '#ffd23f', roll: P => { const r = Math.random(); return r < 0.8 ? pick(P.gold) : r < 0.95 ? pick(P.silver) : weighted(P.icon, p => Math.max(1, 100 - p.ovr)); } },
+  icon: { name: 'Icon Pack', cost: 6000, color: '#fff3b0', roll: (P, i) => i === 2 ? weighted(P.icon, p => Math.max(1, 100 - p.ovr)) : (Math.random() < 0.7 ? pick(P.gold) : pick(P.silver)) },
+};
+
+function showUT() {
+  sceneMode = 'sub'; initUT();
+  const sq = save.squad.map(id => PLAYERS[id]).filter(Boolean), ch = chemistry(sq);
+  go(`<h2>Ultimate Team · FC BROS UT 27</h2><div class="row"><div class="chem">🪙 ${save.coins} coins</div><div class="chem">Cards: ${save.owned.length}</div><div class="chem">Squad: ${sq.length}/11</div><div class="chem">Chemistry: ${ch.pct}%</div><div class="chem">Wins: ${save.wins}</div></div>
+    <div class="menu"><button class="btn big" data-act="play">Play Match</button><button class="btn big alt" data-act="squad">Squad Builder</button><button class="btn big alt" data-act="store">Pack Store</button><button class="btn big alt" data-act="coll">Collection</button><button class="btn dim" data-act="back">Back</button></div>`,
+    { back: showMain, play: utPlay, squad: utSquad, store: utStore, coll: utCollection });
+}
+function utCollection() {
+  const cards = save.owned.map(id => PLAYERS[id]).filter(Boolean).sort((a, b) => b.ovr - a.ovr);
+  go(`<h2>Collection (${cards.length})</h2><div class="cards">${cards.map(p => cardHTML(p)).join('')}</div><div class="menu"><button class="btn" data-act="back">Back</button></div>`, { back: showUT });
+}
+function utStore() {
+  go(`<h2>Pack Store</h2><div class="chem">🪙 ${save.coins} coins</div><div class="row">${Object.entries(PACKS).map(([k, p]) => `<div class="teamchip" style="border-color:${p.color};min-width:170px"><div style="font-size:42px">🎴</div><b style="color:${p.color}">${p.name}</b><div class="small">3 cards${k === 'icon' ? ' · guaranteed Icon/Legend' : ''}</div><button class="btn" data-act="buy_${k}" ${save.coins < p.cost ? 'disabled style="opacity:.5"' : ''}>🪙 ${p.cost}</button></div>`).join('')}</div>
+    <div class="menu"><button class="btn dim" data-act="back">Back</button></div>`, Object.assign({ back: showUT }, Object.fromEntries(Object.keys(PACKS).map(k => ['buy_' + k, () => utOpen(k)]))));
+}
+function utOpen(kind) {
+  const pk = PACKS[kind]; if (save.coins < pk.cost) return;
+  save.coins -= pk.cost; const P = utPools(), got = [];
+  for (let i = 0; i < 3; i++) got.push(pk.roll(P, i));
+  got.sort((a, b) => a.ovr - b.ovr);
+  let refund = 0; const fresh = new Set();
+  got.forEach(p => { if (save.owned.includes(p.id) || fresh.has(p.id)) refund += p.ovr * 3; else { save.owned.push(p.id); fresh.add(p.id); } });
+  save.coins += refund; persist(); utReveal(got, 0, fresh, refund);
+}
+function utReveal(cards, i, fresh, refund) {
+  if (i >= cards.length) {
+    go(`<h2>Pack Opened!</h2><div class="cards">${cards.map(p => cardHTML(p)).join('')}</div>${refund ? `<div class="chem">Duplicates converted: +${refund} coins</div>` : ''}<div class="menu"><button class="btn big" data-act="store">Back to Store</button><button class="btn dim" data-act="hub">UT Hub</button></div>`, { store: utStore, hub: showUT });
+    return;
+  }
+  const p = cards[i], big = p.tier === 'Icon' || p.tier === 'Prime Icon' || p.ovr >= 90;
+  Snd.coin(); if (big) Snd.chime();
+  go(`<div class="walk ${big ? 'big' : ''}"><div class="flare"></div><div class="walkcard">${cardHTML(p)}</div></div><h2 style="text-align:center">${big ? 'WALKOUT! ' : ''}${esc(p.name.replace(' (Prime)', ''))} · ${p.ovr} ${p.pos}</h2><p class="sub">${flagOf(p)} ${esc(p.nationName || '')} ${clubName(p) ? '· ' + esc(clubName(p)) : ''}${fresh.has(p.id) ? '' : ' · DUPLICATE'}</p>
+    <div class="menu"><button class="btn big" data-act="next">${i === cards.length - 1 ? 'Finish' : 'Next Card'}</button></div>`, { next: () => utReveal(cards, i + 1, fresh, refund) }, 'bare');
+}
+
+function utSquad() {
+  const owned = save.owned.map(id => PLAYERS[id]).filter(Boolean).sort((a, b) => b.ovr - a.ovr);
+  let posF = 'ALL';
+  const scr = go(`<h2>Squad Builder</h2><div id="uthead"></div><div class="row"><label>Position</label><select id="up">${['ALL', 'GK', 'CB', 'LB', 'RB', 'CM', 'CAM', 'LW', 'RW', 'ST', 'CF'].map(p => `<option>${p}</option>`).join('')}</select><button class="btn alt" data-act="auto">Auto-pick best</button><button class="btn dim" data-act="clear">Clear</button><button class="btn" data-act="done">Done</button></div>
+    <p class="small" style="text-align:center">Pick up to 11. Players who share a <b>club</b> or <b>nation</b> are linked: each link boosts both players' stats (+2 to +5). Modric + Rakitic = Croatia Hyper-Link (+5). Empty spots are filled with AI.</p><div class="cards" id="utg"></div>`,
+    { done: showUT, clear: () => { save.squad = []; persist(); refresh(); }, auto: () => {
+        const used = new Set(), out = [];
+        ['GK'].concat(SLOTS).forEach(s => { const pos = s === 'GK' ? ['GK'] : SLOT_POS[s]; const c = owned.find(p => !used.has(p.id) && pos.includes(p.pos)); if (c) { used.add(c.id); out.push(c.id); } });
+        save.squad = out; persist(); refresh();
+      } });
+  const refresh = () => {
+    const sq = save.squad.map(id => PLAYERS[id]).filter(Boolean), ch = chemistry(sq);
+    scr.querySelector('#uthead').innerHTML = `<div class="chem">Squad ${sq.length}/11 · Chemistry ${ch.pct}%<div class="bars"><div><span class="bar"><i style="width:${ch.pct}%"></i></span></div></div>${ch.links.length ? '<div class="small" style="font-weight:400">' + ch.links.slice(0, 8).map(l => `🔗 ${esc(l.a.replace(' (Prime)', ''))} ↔ ${esc(l.b.replace(' (Prime)', ''))} (${l.kind})`).join('<br>') + (ch.links.length > 8 ? `<br>+${ch.links.length - 8} more links` : '') + '</div>' : '<div class="small">No links yet - pick players from the same club or nation.</div>'}</div>`;
+    const list = owned.filter(p => posF === 'ALL' || p.pos === posF);
+    scr.querySelector('#utg').innerHTML = list.map(p => cardHTML(p, { sel: save.squad.includes(p.id), boost: save.squad.includes(p.id) ? ch.boost[p.id] : 0 })).join('');
+    scr.querySelectorAll('#utg .card').forEach(c => c.addEventListener('click', () => {
+      Snd.tick(); const id = c.dataset.pid, i = save.squad.indexOf(id);
+      if (i >= 0) save.squad.splice(i, 1); else if (save.squad.length < 11) save.squad.push(id);
+      persist(); refresh();
+    }));
+  };
+  scr.querySelector('#up').addEventListener('change', e => { posF = e.target.value; refresh(); }); refresh();
+}
+
+function utPlay() {
+  const sq = save.squad.map(id => PLAYERS[id]).filter(Boolean);
+  if (!sq.length) { go('<h2>No squad yet</h2><p class="sub">Pick at least one player in the Squad Builder first.</p><div class="menu"><button class="btn big" data-act="sq">Squad Builder</button><button class="btn dim" data-act="back">Back</button></div>', { sq: utSquad, back: showUT }); return; }
+  const tiers = [['Rookie (win 250 🪙)', 0], ['Pro (win 500 🪙)', 1], ['Legend (win 1000 🪙)', 2]];
+  go(`<h2>Choose Opponent</h2><div class="menu">${tiers.map(t => `<button class="btn big ${t[1] === 2 ? '' : 'alt'}" data-act="t${t[1]}">${t[0]}</button>`).join('')}<button class="btn dim" data-act="back">Back</button></div>`,
+    { back: showUT, t0: () => utStart(0), t1: () => utStart(1), t2: () => utStart(2) });
+}
+function utStart(tier) {
+  const sq = save.squad.map(id => PLAYERS[id]).filter(Boolean), ch = chemistry(sq);
+  const boostedSq = sq.map(p => boosted(p, ch.boost[p.id]));
+  const opp = tier === 0 ? pick(NATIONS.filter(n => teamAvg(n.id) <= 77)).id : tier === 1 ? pick(CLUBS).id : 'ICONS';
+  const lead = boostedSq.find(p => p.pos !== 'GK') || null;
+  const win = [250, 500, 1000][tier], draw = [80, 150, 300][tier];
+  launchMatch({ team0: 'UT', team1: opp, picks0: boostedSq, picks1: [], humans: [{ team: 0, pd: lead, scheme: 'solo', label: 'YOU', lock: false }], lvl: [0.6, 0.85, 1][tier], halfLen: 90, labels: ['My Club', TEAMS[opp].name], onQuit: showUT,
+    onEnd: res => {
+      const coins = res.winner === 0 ? win : res.winner === -1 ? draw : 40;
+      save.coins += coins; if (res.winner === 0) save.wins++; persist(); Snd.coin();
+      showResult(res, { title: 'FC BROS UT 27', home: 'My Club', away: TEAMS[opp].name, extra: `<div class="chem">+${coins} coins · Squad chemistry ${ch.pct}%</div>`, buttons: [['Play Again', () => utStart(tier)], ['UT Hub', showUT, 'alt']] });
+    } });
+}
+
+/* ---------------- BOOT ---------------- */
+sceneMode = 'loading';
+lastT = performance.now(); rafId = requestAnimationFrame(frame);
+showLoading();
